@@ -1,0 +1,8 @@
+vaex
+pandas
+numpy
+sklearn
+scipy
+matplotlib
+MulticoreTSNE
+nltk

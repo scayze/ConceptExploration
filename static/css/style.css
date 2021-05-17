@@ -1,0 +1,83 @@
+#outer {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+}
+
+#header {
+    flex: 0 1 auto;
+    margin-left: 20px;
+}
+
+#upperrow {
+    flex: 1 1 auto;
+    width: 100%;
+    font-size: 12;
+}
+
+#graph {
+    margin-top: 0px;
+    margin-right: 0px;
+    flex-grow : 1;
+    height: 300px;
+}
+
+#vis_header {
+    margin-top: 5px;
+    margin-left: 20px;
+    margin-bottom: 0px;
+}
+
+#vis_line {
+    margin-bottom: 0px;
+    border-bottom: 2px solid;
+    border-color: black /* #ced4da; */;
+}
+
+#starglyphpath {
+    stroke-width: 2;
+    stroke: #cacfd2;
+    fill: none;
+}
+
+#starglyph {
+    fill: #e74c3c;
+    fill-opacity: 0.5;
+    stroke: #e74c3c;
+    stroke-width: 2;
+}
+
+svg.leader-line {
+    pointer-events: auto!important;
+}
+
+
+.section:hover {
+    transform: scale(1.1);
+}
+
+.section {
+    transition: all 0.25s;
+    transform-origin: 50% 50%;
+}
+
+#column_header {
+    margin: 0 auto;
+    margin-top: 10px;
+    border-radius: 25px;
+    border: 2px solid black;
+    padding-right: 15px;
+    padding-left: 15px;
+}
+
+.table-align-right {
+    text-align: right !important;
+}
+
+.table-align-center {
+    text-align: center !important;
+}
+
+.table-align-left {
+    text-align: left !important;
+}

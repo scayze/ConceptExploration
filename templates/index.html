@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang = "en">
+    <head>
+        <title>Concept Explorer</title> 
+        <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+       
+
+        <script src="{{ url_for('static', filename='js/lib/d3.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/lib/jquery-3.6.0.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/lib/leader-line.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/lib/color2D.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/vis.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/lib/bootstrap.bundle.min.js') }}"></script>
+
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/lib/bootstrap.min.css') }}">
+    </head>
+
+    <body>
+
+    <!-- Modal -->
+    <div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+        <div class="modal-dialog  modal-xl">
+        <div class="modal-content">
+            
+            <div class="modal-header" style="display: block;">
+                <ul class="nav nav-pills nav-justified" style="margin-left: 150px; margin-right: 150px;" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="starglyph-tab" data-bs-toggle="pill" data-bs-target="#content_starglyph" type="button" role="tab" aria-controls="content_starglyph" aria-selected="true">Starglyph</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="concordance-tab" data-bs-toggle="pill" data-bs-target="#content_concordance" type="button" role="tab" aria-controls="content_concordance" aria-selected="false">Concordance</button>
+                    </li>
+                </ul>
+            </div>
+            <div class="modal-body" id="modal-view">
+                <div class="tab-content" id="myTabContent1" >
+                    <div class="tab-pane fade show active" id="content_starglyph" role="tabpanel" aria-labelledby="starglyph-tab">
+                        <p>Raw denim you probably haven't heard of them jean shorts Austin. Nesciunt tofu stumptown aliqua, retro synth master cleanse. Mustache cliche tempor.</p>
+                    </div>
+                    <div class="tab-pane fade" id="content_concordance" role="tabpanel" aria-labelledby="concordance-tab"> 
+                        <table class="table table-bordered" style="width: 100%" >
+                            <colgroup>
+                                <col span="1" style="width: 40%;">
+                                <col span="1" style="width: 15%;">
+                                <col span="1" style="width: 40%;">
+                                <col span="1" style="width: 5%;">
+                             </colgroup>
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="table-align-right">Left</th>
+                                    <th class="table-align-center">KWIQ</th>
+                                    <th class="table-align-left">Right</th>
+                                    <td class="table-align-center">
+                                        Info
+                                    </td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="table-align-right">Mark</td>
+                                    <td class="table-align-center">Otto</td>
+                                    <td class="table-align-left">@mdo</td>
+                                    <td class="table-align-center">
+                                        <button class="btn btn-secondary" type="button" id="info">!</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="table-align-right">Mark</td>
+                                    <td class="table-align-center">Otto</td>
+                                    <td class="table-align-left">@mdo</td>
+                                    <td class="table-align-center">
+                                        <button class="btn btn-secondary" type="button" id="info">!</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="table-align-right">Mark</td>
+                                    <td class="table-align-center">Otto</td>
+                                    <td class="table-align-left">@mdo</td>
+                                    <td class="table-align-center">
+                                        <button class="btn btn-secondary" type="button" id="info">!</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                          </table>
+                    </div>
+                </div>
+            </div>
+            <!--
+            <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary">Save changes</button>
+            </div>
+            -->
+        </div>
+        </div>
+    </div>
+  
+  
+    <div id="outer">
+        <div id="header">
+            <h1 id="title">Concept Exploration</h1>
+            <form>
+                <div class="form-group row">
+                    <div class="col-sm-3">
+                        <label for="searchterm">Searchterm</label>
+                        <input class="form-control" id="searchterm" type="text" placeholder="Search the Data" />
+                    </div>  
+
+                    <div class="col-sm-2">
+                        <label for="interval_dropdown">Time Interval</label>
+                        <select class="form-select" id="interval_dropdown">
+                            <option value=1 selected="selected">Monthly</option>
+                            <option value=12>Yearly</option>
+                            <option value=60>5 Yearly</option>
+                        </select>
+                    </div>
+
+                    <div class="col-sm-1">
+                        <label for="datefrom">From</label>
+                        <input type="month" class="form-control" id="datefrom"  placeholder="yyyy-mm" />
+                    </div>
+
+                    <div class="col-sm-1">
+                        <label for="dateto">To</label>
+                        <input type="month" class="form-control" id="dateto" placeholder="yyyy-mm" />
+                    </div>
+
+
+                    <div class="col-sm-1">
+                        <label for="resultcount">Result Count</label>
+                        <input type="number" class="form-control" id="resultcount" value="5" />
+                    </div>
+
+                    <div class="col-sm-1"> 
+                        <label for="submit">Text</label>
+                        <button class="btn btn-primary form-select" type="button" id="submit">Search</button>
+                    </div> 
+                </div>
+            </form>
+        </div>
+        <h4 id="vis_header">Visualization</h4>
+        <div id="vis_line"></div>
+        <div class="row" id="graph"></div>
+    </div>
+   </body>
+</html>

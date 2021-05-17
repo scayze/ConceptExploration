@@ -1,0 +1,10 @@
+*.tgz
+*.csv
+*.pck
+*.hdf5
+/data/nyt_corpus
+/data/glove
+/bpm-env
+/dask
+/.vscode
+__pycache__/
