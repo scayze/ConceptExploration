@@ -1,4 +1,7 @@
-
+var current_term = "climate change"
+var current_detail = "climate change"
+var current_date_from = "2001-01"
+var current_date_to = "2001-10"
 
 $(function() {
     Color2D.setColormap(Color2D.colormaps.ZIEGLER, function() {}); 
@@ -14,26 +17,77 @@ $(function() {
         });
         return false;
     });
-});
+    $('#concordance-tab').bind('click', function() {
+        var table_body = d3.select("#concordance_table")
+        table_body.selectAll("*").remove()
 
-$(function() {
-    $('#testbutton').bind('click', function() {
-        console.log(document.getElementById("detailModal"))
+        $.getJSON('/_get_concordance', {
+        term: current_term,
+        word: current_detail,
+        from: current_date_from,
+        to: current_date_to,
+        }, function(data) {
+            updateConcordance(data.result)
+        });
+        return false;
     });
 });
 
+
+function updateConcordance(data) {
+    var table_body = d3.select("#concordance_table")
+
+    for(let occurance of data) {
+        console.log(occurance.url)
+        let onInfoClick = function() {
+            openLink(occurance.url)
+        }
+
+        var tr = table_body.append("tr")
+        tr.append("td")
+            .attr("class","table-align-right")
+            .style("overflow","hidden")
+            .style("text-overflow","ellipsis")
+            .style("word-wrap","break-word")
+            .text(occurance.left)
+        tr.append("td")
+            .attr("class","table-align-center")
+            .style("text-overflow","ellipsis")
+            .style("overflow","hidden")
+            .style("word-wrap","break-word")
+            .html("<p style=\"color:#FF0000\";>" + occurance.kwiq + "</p>")
+        tr.append("td")
+            .attr("class","table-align-left")
+            .style("text-overflow","ellipsis")
+            .style("overflow","hidden")
+            .style("word-wrap","break-word")
+            .text(occurance.right)
+        tr.append("td")
+            .attr("class","table-align-center")
+            .append("button")
+            .attr("class","btn btn-secondary")
+            .attr("type","button")
+            .attr("id","info")
+            .text("!")
+            .on("click", onInfoClick)
+    }
+}
+
 function updateGraph(data) {
+    console.log(data)
     interval = d3.select("#graph")
     searchterm = d3.select("#searchterm").text()
     var graph = d3.select("#graph")
     graph.html("")
+
+    current_term = searchterm
 
     d3.selectAll(".leader-line").remove()
 
     headers = []
     column_list = []
     
-    for (var key in data) {
+    for (let key in data) {
         var col = graph.append("div")
             .attr("class","col")
             .style("display","flex")
@@ -50,9 +104,10 @@ function updateGraph(data) {
 
         headers.push(header)
 
-        word_dict = data[key]
+        let column_dict = data[key]
+        let word_dict = column_dict.words
         //console.log(word_dict)
-        for(var word of Object.keys(word_dict)) { 
+        for(let word of Object.keys(word_dict)) { 
             //Get 2D embedding of word
             var data_2d = word_dict[word]
 
@@ -80,6 +135,13 @@ function updateGraph(data) {
             glyphdata = {"a": Math.random(), "b": Math.random(), "c": Math.random(), "d": Math.random(), "e": Math.random()}
             //Create circle and starglyph
             circle = create_circle(svg,formatted_color,word) //#f3f3f3
+            .on("click",function() {
+                current_date_from = column_dict.date_from
+                current_date_to = column_dict.date_to
+                current_detail = word
+                showModal()
+            })
+
             create_starglyph(svg,glyphdata,75,75,39,false) //Starglyph is 1 pixel smaller in radius to compensate for border
         }
     }
@@ -225,7 +287,6 @@ function create_circle(svg,color,text) {
         .attr('data-text',text)
         //.attr("data-bs-toggle","modal")
         //.attr("data-bs-target","#detailModal")
-        .on("click",showModal)
 
     svg.append("text")
         .attr("x","50%")
@@ -264,13 +325,16 @@ function create_glyph_circle(layout,color,text) {
         .on("click")
 }
 
+function openLink(url) {
+    window.open(url, '_blank').focus();
+}
 
 function showModal() {
     console.log("HALLO")
     var myModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
-
+    $('#starglyph-tab').trigger('click')
     var view = d3.select("#content_starglyph")
-    view.selectAll("*").remove();
+    view.selectAll("*").remove()
     create_glyph_circle(view,"green","aaaa")
     var view = d3.select("#content_concordance")
     //view.selectAll("*").remove();

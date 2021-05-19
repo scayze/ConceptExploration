@@ -1,8 +1,11 @@
-vaex
+vaex-core
+vaex-hdf5
 pandas
 numpy
 sklearn
 scipy
 matplotlib
+cmake
 MulticoreTSNE
 nltk
+flask

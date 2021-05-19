@@ -29,17 +29,15 @@ def group_dataframe_vx(df,interval):
     df.export_csv("lolalasdlasdla.csv")
     return df
 
-def group_dataframe_pd(df,interval,date_from = "",date_to = ""):
-    df = df.groupby(pd.Grouper(freq=str(interval) + "M"))
-    df = df['data'].apply(lambda x: ''.join(x))
+def group_dataframe_pd(df,interval,date_from,date_to):
     if date_from != "" and date_to != "":
-        start_date = pd.to_datetime(date_from)
-        end_date = pd.to_datetime(date_to)
-        df.index=pd.to_datetime(df.index)
-        df = df.loc[start_date:end_date]
-        #df = df.between_time(date_from,date_to)
-        #df = df.loc[(df['time'] > pd.to_datetime(date_from)) & (df['time'] <= pd.to_datetime(date_to))]
-    df.to_csv("dategroupselect.csv")
+        #df.index=pd.to_datetime(df.index)
+        #df.sort_index()
+        print(df.head(2))
+        df = df[(pd.to_datetime(df.index) >= date_from) & (pd.to_datetime(df.index) <= date_to)]
+        #df = df.loc[date_from:date_to]
+    df = df.groupby(pd.Grouper(freq=str(interval) + "M"))
+    df = df['textdata'].apply(lambda x: ''.join(x))
     return pd.DataFrame(df)
 
 def split(a, n):

@@ -7,4 +7,5 @@
 /bpm-env
 /dask
 /.vscode
+/.bp-env
 __pycache__/

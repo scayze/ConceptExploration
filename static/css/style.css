@@ -81,3 +81,16 @@ svg.leader-line {
 .table-align-left {
     text-align: left !important;
 }
+
+.cut-off td:nth-child(1) {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    direction:rtl;
+}
+
+.cut-off td:nth-child(3) {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
