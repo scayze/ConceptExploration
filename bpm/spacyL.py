@@ -1,41 +1,50 @@
 import spacy
+from spacy.tokens import DocBin
 import pandas as pd
 import regex as re
+import os
 from nltk.corpus import stopwords
 from spacy.lang.en.stop_words import STOP_WORDS
-import bpm 
-
-nlp = spacy.load("en_core_web_sm", disable=['parser', 'ner'])
-#nlp.initialize()
+import tarfile
+import nyt_corpus as nyt
 
 
 stops = STOP_WORDS
-count=0
 
-def normalize(text):
-    global count
-    sentences = text.split(".")
-    for i in range(0,len(sentences)):
-        doc = nlp(sentences[i])
-        sentences[i] = ""
-        for token in doc:
-            if token in stops: continue
-            sentences[i] += " " + token.lemma_.lower()
-        
-        #sentences[i] = re.sub(r"[#@<>-_,;()\[\]{}=+-'\"]", ' ', sentences[i])
-        sentences[i] = re.sub(r"[^a-zA-Z]+", ' ', sentences[i])
+def process_archieve(nlp,path = ""):  
+    user_data = []
+    list_document = []
 
+    with tarfile.open(path, 'r:*') as tar:
 
-    count += 1
-    print(count)
-    return ".".join(sentences)
+        for inner_file in tar:
+            # Skip everything but the articles
+            if not inner_file.name.endswith(".xml"): continue
+            # Extract single document
+            content = tar.extractfile(inner_file).read().decode('utf8')
+            url, date, doc = nyt.read_nitf_file_vx(content,"pandas")
+            # Append data
+            if doc == "": continue
+            meta = {"url": url, "date": date}
+            user_data.append(meta)
+            list_document.append(doc)
+            #break
 
-def create_dataframe(interval):  
-    df = pd.read_csv("scripts/data/articles1.csv")[["time","sentences"]]
-    df["sentences"] = bpm.tools.parallelize_on_rows(df["sentences"],normalize)
-    df.to_csv("scripts/data/lemmatest.csv")
-    return df
+    doc_bin = DocBin(attrs=["LEMMA", "POS", "ENT_TYPE","IS_STOP"],store_user_data=True)
+    
+    i=0
+    for doc in nlp.pipe(list_document,n_process=4,batch_size=100):
+        doc.user_data = user_data[i]
+        doc_bin.add(doc)
+        i+=1
+        print("Done: " + str(i))
+    #print(nlp.config)
+    nlp.to_disk("project.nlp")
+    doc_bin.to_disk(path[:-4] + ".spacy")
 
 if __name__ == '__main__':
-    create_dataframe(12)
+    nlp = spacy.load("en_core_web_sm", disable=['parser'])
+    if os.path.isdir('project.nlp'):
+        nlp.from_disk('project.nlp')
+    process_archieve(nlp,"data/nyt_corpus/data/2000/01.tgz")
 

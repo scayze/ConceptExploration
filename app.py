@@ -11,8 +11,9 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import regex as re
+import os
 
-from flask import Flask, json, jsonify, g, redirect, request, url_for, render_template
+from flask import Flask, json, jsonify, g, redirect, request, url_for, render_template, send_from_directory
 
 app = Flask(__name__)
 
@@ -98,6 +99,8 @@ def search_term():
     date_to = request.args.get('to', 0, type=str)
     count = int(request.args.get('count', 0, type=str))
 
+
+
     if term =="": return jsonify({})
 
     app.logger.info('Request with' + 
@@ -107,10 +110,13 @@ def search_term():
         " to:" + date_to + 
         " count:" + str(count)
     )
+    date_from = pd.to_datetime(date_from).tz_localize(None)
+    date_to = pd.to_datetime(date_to).tz_localize(None)
+
     print("load data into memory")
-    doc_list = nyt.get_data_between_pd(term,pd.to_datetime(date_from),pd.to_datetime(date_to))
+    doc_list = nyt.get_data_between_pd(term,date_from,date_to)
     print("group")
-    doc_list = tools.group_dataframe_pd(doc_list,interval,pd.to_datetime(date_from),pd.to_datetime(date_to))
+    doc_list = tools.group_dataframe_pd(doc_list,interval,date_from,date_to)
     print("calculate statistics")
     #names, vectors = co.calculate_td_idf_scores2(doc_list["data"].to_list())
     #tft, cv = co.calculate_idf_scores(doc_list["data"].to_list())
@@ -129,13 +135,16 @@ def search_term():
         column_data["date_from"] =  date_from
         column_data["date_to"] = date_from + pd.DateOffset(months=interval)
 
-        word_2d = {}
+        word_list = {}
         for w in list(topn.index):
-            word_2d[w] = [0,0]
+            word_data = {}
+            word_data["position"] = [0,0]
+            word_data["tfidf"] = str(topn.at[w,"tfidf"])
             if w in glove_words:
-                idx = glove_words.index(w)
-                word_2d[w] = list(glove_data[idx])
-        column_data["words"] = word_2d
+                idx = glove_words.index(w) 
+                word_data["position"] = list(glove_data[idx])
+            word_list[w] = word_data
+        column_data["words"] = word_list
         output[key] = column_data
 
     return jsonify(result=output)
@@ -165,3 +174,4 @@ if __name__ == "__main__":
     all_data = None
     
     app.run(debug=True)
+    app.add_url_rule('/favicon.ico', redirect_to=url_for('static', filename='favicon.ico'))

@@ -4,6 +4,7 @@ pandas
 numpy
 sklearn
 scipy
+spacy
 matplotlib
 cmake
 MulticoreTSNE

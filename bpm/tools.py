@@ -33,7 +33,7 @@ def group_dataframe_pd(df,interval,date_from,date_to):
     if date_from != "" and date_to != "":
         #df.index=pd.to_datetime(df.index)
         #df.sort_index()
-        print(df.head(2))
+        #print(df.head(2))
         df = df[(pd.to_datetime(df.index) >= date_from) & (pd.to_datetime(df.index) <= date_to)]
         #df = df.loc[date_from:date_to]
     df = df.groupby(pd.Grouper(freq=str(interval) + "M"))

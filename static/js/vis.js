@@ -17,6 +17,21 @@ $(function() {
         });
         return false;
     });
+    $('#starglyph-tab').bind('click', function() {
+        var tab_body = d3.select("#content_starglyph")
+        tab_body.selectAll("*").remove()
+
+        $.getJSON('/_search_term', {
+        term: current_detail,
+        interval: $('#interval_dropdown').val(),
+        from: current_date_from,
+        to: current_date_to,
+        count: 5,
+        }, function(data) {
+            updateStarglyph(data.result)
+        });
+        return false;
+    });
     $('#concordance-tab').bind('click', function() {
         var table_body = d3.select("#concordance_table")
         table_body.selectAll("*").remove()
@@ -33,34 +48,45 @@ $(function() {
     });
 });
 
+//Function that is called when the starglyph tab is opened in the detail tab
+function updateStarglyph(data) {
+    console.log(data)
+    var tab = d3.select("#content_starglyph")
+    
+    for (let key in data) {
+        let column_dict = data[key]
+        let word_list_dict = column_dict.words
+        //console.log(word_dict)
+
+        glyphdata = {}
+        for(let word of Object.keys(word_list_dict)) { 
+            //Random data for starglyph
+            glyphdata[word] = word_list_dict[word].tfidf
+        }
+        //Create starglyph
+        create_glyph_circle(tab,glyphdata)
+        break //There should not be more than one column anyway
+    }
+}
 
 function updateConcordance(data) {
     var table_body = d3.select("#concordance_table")
 
+    var count = 0
+    max_count = 50
     for(let occurance of data) {
-        console.log(occurance.url)
-        let onInfoClick = function() {
-            openLink(occurance.url)
-        }
+        count += 1
+        if(count > max_count) break
 
         var tr = table_body.append("tr")
         tr.append("td")
             .attr("class","table-align-right")
-            .style("overflow","hidden")
-            .style("text-overflow","ellipsis")
-            .style("word-wrap","break-word")
             .text(occurance.left)
         tr.append("td")
             .attr("class","table-align-center")
-            .style("text-overflow","ellipsis")
-            .style("overflow","hidden")
-            .style("word-wrap","break-word")
             .html("<p style=\"color:#FF0000\";>" + occurance.kwiq + "</p>")
         tr.append("td")
             .attr("class","table-align-left")
-            .style("text-overflow","ellipsis")
-            .style("overflow","hidden")
-            .style("word-wrap","break-word")
             .text(occurance.right)
         tr.append("td")
             .attr("class","table-align-center")
@@ -69,7 +95,9 @@ function updateConcordance(data) {
             .attr("type","button")
             .attr("id","info")
             .text("!")
-            .on("click", onInfoClick)
+            .on("click", function() {
+                openLink(occurance.url)
+            })
     }
 }
 
@@ -105,11 +133,11 @@ function updateGraph(data) {
         headers.push(header)
 
         let column_dict = data[key]
-        let word_dict = column_dict.words
+        let word_list_dict = column_dict.words
         //console.log(word_dict)
-        for(let word of Object.keys(word_dict)) { 
+        for(let word of Object.keys(word_list_dict)) { 
             //Get 2D embedding of word
-            var data_2d = word_dict[word]
+            var data_2d = word_list_dict[word].position
 
             //Clamp values to bettter fit data in colormap, creating more varied colors
             var xrange = [-2,4.5]
@@ -120,7 +148,6 @@ function updateGraph(data) {
             var rgb = Color2D.getColor(data_2d[0], data_2d[1])
             //Convert color to css color value
             var formatted_color = "rgb(" + rgb[0].toString() + ", " + rgb[1].toString() + ", " + rgb[2].toString() + ")" 
-            console.log(word + " " + data_2d.toString() + " " + rgb.toString())
 
             //Create a div which will contain each datapoint (circle+text)
             var cricle_div = col.append("div")
@@ -165,7 +192,6 @@ function updateGraph(data) {
         .attr("title","Tooltip on top")
 
     //Create lines between circles of same text to visualize bridge terms
-    console.log(column_list.length)
     for(var i=1; i<column_list.length; i++) {  
         var c_curr = column_list[i]
         var c_prev = column_list[i-1]
@@ -176,12 +202,7 @@ function updateGraph(data) {
             c_prev.selectAll("circle").each(function() {
                 e_prev = d3.select(this)
                 if(e_curr.attr("data-text") === e_prev.attr("data-text")) {
-                    /* This alternative is for lines starting at the center of circles
-                    var line = new LeaderLine(
-                        LeaderLine.pointAnchor(e_prev.node(), {x: 41, y: 41}),
-                        LeaderLine.pointAnchor(e_curr.node(), {x: 41, y: 41})
-                    );
-                    */
+
                     var line = new LeaderLine(
                         e_prev.node(),
                         e_curr.node()
@@ -253,7 +274,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
                 .attr("stroke","51c5cf")
                 .attr("stroke-width","20px")
                 .attr("dy",".3em")
-                .text("label")
+                .text(key)
         }
 
     }
@@ -301,18 +322,18 @@ function create_circle(svg,color,text) {
         return circle
 }
 
-function create_glyph_circle(layout,color,text) {
+function create_glyph_circle(layout,data) {
     var cricle_div = layout.append("div")
-    var cx = 200
+    var cx = 300
     var cy = 200
     var r = 150
     var svg = cricle_div.append("svg")
-        .attr("width", 400)
+        .attr("width", 600)
         .attr("height", 400)
         .style("margin", "auto")
         .style("display", "block")
     
-    create_starglyph(svg,{"hallo": 0.5, "hello": 0.6, "hoi": 1.0, "bonjour": 0.8, "Moin": 1.0},cx,cy,r)
+    create_starglyph(svg,data,cx,cy,r)
 
     svg.append("circle")
         .attr('cx', cx)
@@ -330,18 +351,9 @@ function openLink(url) {
 }
 
 function showModal() {
-    console.log("HALLO")
     var myModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
-    $('#starglyph-tab').trigger('click')
-    var view = d3.select("#content_starglyph")
-    view.selectAll("*").remove()
-    create_glyph_circle(view,"green","aaaa")
-    var view = d3.select("#content_concordance")
-    //view.selectAll("*").remove();
-    //view.append("div").text("CONC")
-
     
-    //create_starglyph(svg,{"hallo": 0.5, "hello": 0.6, "hoi": 1.0, "bonjour": 0.8, "Moin": 1.0})
     myModal.show()
+    document.getElementById("starglyph-tab").click() //Emulate click on first tab element tor reset detail modal
 }
 

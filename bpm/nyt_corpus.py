@@ -4,13 +4,13 @@ import pandas as pd
 import os
 import sys
 import regex as re
-import bpm.co_occurance as co
+import co_occurance as co
 import pickle 
 #import scipy
 import xml.etree.ElementTree as ET
 from pathlib import Path
 import glob
-import bpm.tools
+import tools
 from datetime import datetime
 import time
 import threading
