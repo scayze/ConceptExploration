@@ -21,16 +21,13 @@ def dummy(doc):
 
 def calculate_idf_scores(documents,vocab=None):
     #instantiate CountVectorizer() 
-
+    #No Ngram range as that is handled by textacy.extract over at processing.py
     cv=CountVectorizer(
         tokenizer=dummy,
         preprocessor=dummy,
         stop_words=stopwords,
         dtype = np.int32,
-        #strip_accents = 'unicode',
-        #ngram_range=(1,1),
         min_df=2,
-        #max_df=2.0
     ) 
     # this steps generates word counts for the words in your docs 
     print("count fit")
@@ -39,13 +36,6 @@ def calculate_idf_scores(documents,vocab=None):
     print("tfidf fit")
     tfidf_transformer=TfidfTransformer(smooth_idf=True,use_idf=True) 
     tfidf_transformer.fit(word_count_vector)
-
-    # print idf values 
-    #df_idf = pd.DataFrame(tfidf_transformer.idf_, index=cv.get_feature_names(),columns=["idf_weights"]) 
-    
-    # sort ascending 
-    #df_idf = df_idf.sort_values(by=['idf_weights'])
-    #df_idf.to_csv("hallo1.csv")
 
     return tfidf_transformer, cv
 
