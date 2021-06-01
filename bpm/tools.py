@@ -37,7 +37,7 @@ def group_dataframe_pd(df,interval,date_from,date_to):
         df = df[(pd.to_datetime(df.index) >= date_from) & (pd.to_datetime(df.index) <= date_to)]
         #df = df.loc[date_from:date_to]
     df = df.groupby(pd.Grouper(freq=str(interval) + "M"))
-    df = df['textdata'].apply(lambda x: ''.join(x))
+    df = df['textdata'].agg(sum)
     return pd.DataFrame(df)
 
 def split(a, n):

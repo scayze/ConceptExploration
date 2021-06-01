@@ -2,6 +2,7 @@
     display: flex;
     flex-flow: column;
     height: 100%;
+    overflow-x: hidden;
 }
 
 #header {
@@ -17,9 +18,9 @@
 
 #graph {
     margin-top: 0px;
-    margin-right: 0px;
     flex-grow : 1;
-    height: 300px;
+    height: 100%;
+    overflow-x: scroll;
 }
 
 #vis_header {

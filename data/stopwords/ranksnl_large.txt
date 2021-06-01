@@ -1,3 +1,5 @@
+$
+|
 'll
 've
 a
@@ -123,6 +125,7 @@ done
 down
 downwards
 dr
+dr.
 due
 during
 e
@@ -302,8 +305,11 @@ moreover
 most
 mostly
 mr
+mr.
 mrs
+mrs.
 ms
+ms.
 much
 mug
 must

@@ -3,6 +3,10 @@ var current_detail = "climate change"
 var current_date_from = "2001-01"
 var current_date_to = "2001-10"
 
+var lines = []
+
+window.requestAnimationFrame(redraw_lines);
+
 $(function() {
     Color2D.setColormap(Color2D.colormaps.ZIEGLER, function() {}); 
     $('#submit').bind('click', function() {
@@ -17,6 +21,7 @@ $(function() {
         });
         return false;
     });
+    /*
     $('#starglyph-tab').bind('click', function() {
         var tab_body = d3.select("#content_starglyph")
         tab_body.selectAll("*").remove()
@@ -32,6 +37,7 @@ $(function() {
         });
         return false;
     });
+    */
     $('#concordance-tab').bind('click', function() {
         var table_body = d3.select("#concordance_table")
         table_body.selectAll("*").remove()
@@ -47,6 +53,15 @@ $(function() {
         return false;
     });
 });
+
+function redraw_lines() {
+    return
+    for(l of lines) {
+        l.position()
+    }
+    window.requestAnimationFrame(redraw_lines);
+    //console.log("SCOLL")
+}
 
 //Function that is called when the starglyph tab is opened in the detail tab
 function updateStarglyph(data) {
@@ -104,7 +119,8 @@ function updateConcordance(data) {
 function updateGraph(data) {
     console.log(data)
     interval = d3.select("#graph")
-    searchterm = d3.select("#searchterm").text()
+    searchterm = d3.select("#searchterm").property("value")
+    
     var graph = d3.select("#graph")
     graph.html("")
 
@@ -113,6 +129,7 @@ function updateGraph(data) {
     d3.selectAll(".leader-line").remove()
 
     headers = []
+    lines = []
     column_list = []
     
     for (let key in data) {
@@ -140,8 +157,8 @@ function updateGraph(data) {
             var data_2d = word_list_dict[word].position
 
             //Clamp values to bettter fit data in colormap, creating more varied colors
-            var xrange = [-2,4.5]
-            var yrange = [-2,2.5]
+            var xrange = [-0.3,0.8]
+            var yrange = [-0.4,0.6]
             data_2d[0] = Math.max( xrange[0], Math.min(data_2d[0], xrange[1]))
             data_2d[1] = Math.max( yrange[0], Math.min(data_2d[1], yrange[1]))
             Color2D.ranges = {x: xrange, y: yrange}; 
@@ -153,7 +170,7 @@ function updateGraph(data) {
             var cricle_div = col.append("div")
             var svg = cricle_div.append("svg")
                 .attr("id","circle_div")
-                .attr("width", 150)
+                .attr("width", 200)
                 .attr("height", 150)
                 .style("margin", "auto")
                 .style("display", "block")
@@ -169,7 +186,7 @@ function updateGraph(data) {
                 showModal()
             })
 
-            create_starglyph(svg,glyphdata,75,75,39,false) //Starglyph is 1 pixel smaller in radius to compensate for border
+            create_starglyph(svg,glyphdata,100,75,39,false) //Starglyph is 1 pixel smaller in radius to compensate for border
         }
     }
 
@@ -184,6 +201,7 @@ function updateGraph(data) {
             endPlugSize: 1,
         });
         line.size = 2
+        lines.push(line)
     }
     
     d3.selectAll(".leader-line")
@@ -216,12 +234,18 @@ function updateGraph(data) {
                     });
                     line.size = 2
                     line.path = "fluid"
+                    lines.push(line)
                 }
             })
         })
     }
 
     d3.selectAll(".leader-line").style("z-index",-5)
+    //var uff = d3.selectAll(".leader-line").remove().each(function() {
+    //    d3.select("#graph").append(this)
+    //})
+    
+    //document.getElementById('graph').appendChild(document.querySelector('.leader-line'));
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl)
@@ -298,7 +322,7 @@ function create_circle(svg,color,text) {
     circle = svg.append("circle")
         .attr("id","datacircle")
         .attr("class","section")
-        .attr('cx', 75)
+        .attr('cx', 100)
         .attr('cy', 75)
         .attr('r', 40)
         .attr('stroke', color)

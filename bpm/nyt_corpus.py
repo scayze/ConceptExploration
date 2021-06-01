@@ -1,21 +1,29 @@
 import pickle
+import sys
+sys.path.append("C:/Users/Manu/Documents/repos/D3Test/")
 import numpy as np
 import pandas as pd
 import os
 import sys
 import regex as re
-import co_occurance as co
+import bpm.co_occurance as co
 import pickle 
 #import scipy
 import xml.etree.ElementTree as ET
 from pathlib import Path
 import glob
-import tools
+import bpm.tools
 from datetime import datetime
 import time
 import threading
 import vaex as vx
 import tarfile
+import spacy
+import spacy.attrs
+from spacy.tokens import DocBin
+
+from textacy import extract
+from functools import partial
 
 re_special_characters = re.compile(r"[^a-z]+")
 
@@ -76,7 +84,7 @@ def read_nitf_folder(path,dist):
 
 def clean_corpus():
     path = 'data/nyt_corpus/data/'
-    endings = [".bz2",".gzip",".pkl",".npz",".csv",".pkt"]
+    endings = [".spacy"]
 
     prompt = " [YES/NO] "
     question = "THIS WILL DELETE ALL FILES WITH THE TYPES " + " ".join(endings) + " FOUND IN THE CORPUS"
@@ -143,7 +151,7 @@ def read_nitf_file_vx(content,backend = "vaex"):
         if block.get("class") != "full_text": continue
         
         par_list = [p.text for p in block.findall("p")]
-        text = " | ".join(par_list).lower()
+        text = "\n ".join(par_list)
         return pub_url, pub_date, text
     return pub_url, pub_date, "" #Return empty text if none was found
 
@@ -250,56 +258,71 @@ def generate_day_data_vx(backend = "vaex"):
     
     print("SUCCESSS WOOOO")
 
+def extract_terms(doc):
+    terms = extract.terms(  
+        doc,
+        ngs=lambda doc: extract.ngrams(
+            doc,
+            n=[2],
+            filter_nums=True,
+            filter_punct=True,
+            filter_stops=True,
+        ),
+        ents=partial(
+            extract.entities, 
+            include_types=["PERSON","ORG","NORP","FAC","GPE","LOC","PRODUCT","EVENT"]
+        )
+    )
+    return [term.text.lower() for term in terms if term.text.lower() not in co.stopwords]
 
-def generate_day_data_vx2(backend = "vaex"):
+def get_raw_docs(date_from,date_to):
+    print("LOADING RAW DOCS")
     path = 'data/nyt_corpus/data/'
-    num_threads = 4
-    year_folders = [f.path for f in os.scandir(path) if f.is_dir()]
-    year_split = list(tools.split(year_folders,num_threads))
-    threads = [None] * num_threads
-    results = [None] * num_threads
-
-    for i in range(0,num_threads):
-        threads[i] = threading.Thread(target=generate_data_year_vx2, args=(year_split[i],results,i,backend))
-    
-    for t in threads:
-        t.start()
-
-    for t in threads:
-        t.join()
-    
-    print("SUCCESSS WOOOO")
-
-def get_data_between_pd(term,date_from,date_to):
-    print("load")
-    path = 'data/nyt_corpus/data/'
-    df_list = []
+    nlp = spacy.load("en_core_web_sm")
+    nlp.from_disk('project.nlp')
+    bin = DocBin(attrs=["LEMMA", "POS", "ENT_TYPE", "ENT_IOB"],store_user_data=True)
 
     for root, dirs, files in os.walk(path):
         
         for f in files:
-            if not f.endswith('.pck'): continue
-            
-            p = os.path.join(root, f)
-            
-            date = pd.to_datetime(p[len(path):-4])    #convert filepath to a datetime object.
-            if date < date_from or date >= date_to: continue      #filter if date is not withon [from:to]
+            if not f.endswith('.spacy'): continue
+            p = os.path.join(root, f) #Get full path between the base path and the file
+            date = pd.to_datetime(p[len(path):-6]) #convert filepath to a datetime object.
+            if date < date_from or date >= date_to: continue #filter if date is not withon [from:to]
             print(date)
-            df = pd.read_pickle(p)    #read the data of the current day
-            df_list.append(df)                          #append d
+            new_bin = DocBin().from_disk(p)
+            new_bin.store_user_data=True
+            bin.merge(new_bin) #Merge DocBins
+    
+    return bin.get_docs(nlp.vocab)
+
+def get_data_between(term,date_from,date_to):
 
 
-    print("concat")
-    df = pd.concat(df_list)
-    print("drop")
-    if term != "":
-        df = df[df["textdata"].str.contains(term)]
-    #tools.parallelize_on_rows(df["data"],termify)
-    #print("save")
-    df.to_csv("HahsdhashdhAS.csv")
+    docs = get_raw_docs(date_from,date_to)
+
+    print("dropping")
+    token_lists = []
+    date_list = []
+    url_list = []
+    if term=="":
+        for doc in docs:
+            tokens = extract_terms(doc)
+            token_lists.append(tokens)
+            date_list.append(doc.user_data["date"])
+            url_list.append(doc.user_data["url"])
+    else:
+        for doc in docs:
+            tokens = extract_terms(doc)
+            if term not in tokens: continue
+            token_lists.append(tokens)
+    
+            date_list.append(doc.user_data["date"])
+            url_list.append(doc.user_data["url"])
+    df = pd.DataFrame.from_dict({"date":date_list, "url":url_list, "textdata":token_lists})
+    df = df.set_index("date")
+    df.index = pd.to_datetime(df.index)
     return df
 
-if __name__ == '__main__':
-    generate_day_data_vx2(backend = "pandas")
-    pass
-    #aaaaa = pd.read_pickle("pd_data.pck")
+
+

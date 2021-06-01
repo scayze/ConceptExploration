@@ -17,7 +17,7 @@
         <link rel="stylesheet" href="{{ url_for('static', filename='css/lib/bootstrap.min.css') }}">
     </head>
 
-    <body>
+    <body style="overflow-x: hidden;">
 
     <!-- Modal -->
     <div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
@@ -50,7 +50,7 @@
                             <thead class="table-light">
                                 <tr>
                                     <th class="table-align-right">Left</th>
-                                    <th class="table-align-center">KWIQ</th>
+                                    <th class="table-align-center">KWIC</th>
                                     <th class="table-align-left">Right</th>
                                     <td class="table-align-center">
                                         Info
@@ -58,30 +58,6 @@
                                 </tr>
                             </thead>
                             <tbody id="concordance_table">
-                                <tr>
-                                    <td class="table-align-right">Mark</td>
-                                    <td class="table-align-center">Otto</td>
-                                    <td class="table-align-left">@mdo</td>
-                                    <td class="table-align-center">
-                                        <button class="btn btn-secondary" type="button" id="info">!</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="table-align-right">Mark</td>
-                                    <td class="table-align-center">Otto</td>
-                                    <td class="table-align-left">@mdo</td>
-                                    <td class="table-align-center">
-                                        <button class="btn btn-secondary" type="button" id="info">!</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="table-align-right">Mark</td>
-                                    <td class="table-align-center">Otto</td>
-                                    <td class="table-align-left">@mdo</td>
-                                    <td class="table-align-center">
-                                        <button class="btn btn-secondary" type="button" id="info">!</button>
-                                    </td>
-                                </tr>
                             </tbody>
                           </table>
                     </div>
@@ -142,7 +118,7 @@
         </div>
         <h4 id="vis_header">Visualization</h4>
         <div id="vis_line"></div>
-        <div class="row" id="graph"></div>
+        <div class="row flex-row flex-nowrap" id="graph" onscroll=""></div>
     </div>
    </body>
 </html>

@@ -1,39 +1,45 @@
-from datetime import date
 import sys
+import time
+
+from numpy import extract
 sys.path.append("C:/Users/Manu/Documents/repos/D3Test/")
 
-from pandas.io import pickle
 import bpm.co_occurance as co
 import bpm.nyt_corpus as nyt
 import bpm.tools as tools
-import pandas as pd
-import pickle
+import bpm.word_embeddings as we
 import matplotlib.pyplot as plt
-import numpy as np
+
+import pandas as pd
+from pandas.io import pickle
+
+from textacy import extract as textract
+
+import pickle
 import regex as re
-import os
 
 from flask import Flask, json, jsonify, g, redirect, request, url_for, render_template, send_from_directory
 
 app = Flask(__name__)
 
 
-all_data = None
 tft = None
 cv = None
 
-glove_words = None
-glove_data = None
+embedding_vocab = None
+embedding_data = None
+
+query_cache = {}
 
 def initialize_w2v():
     pass
 
 def initialize_idf():
     print("load all data")
-    all_data = nyt.get_data_between_pd("",pd.to_datetime("1970"),pd.to_datetime("2010"))
+    all_data = nyt.get_data_between("",pd.to_datetime("1970"),pd.to_datetime("2010"))
     print("get idf scores")
-    a, b = co.calculate_idf_scores(all_data["data"])
-    with open('idf_data.pk', 'wb') as f:
+    a, b = co.calculate_idf_scores(all_data["textdata"])
+    with open('idf_data.pck', 'wb') as f:
         pickle.dump([a,b], f)
 
 @app.route('/')
@@ -55,42 +61,35 @@ def find_matches():
         " to:" + date_to
     )
 
-
     date_from = pd.to_datetime(date_from).tz_localize(None)
     date_to = pd.to_datetime(date_to).tz_localize(None)
-    df = nyt.get_data_between_pd(term,date_from,date_to)
-    df = df[df["textdata"].str.contains(word)]
-    
-    for index, row in df.iterrows():
-        url = row["url"]
-        content = row["textdata"]
-        occurances = [m.start() for m in re.finditer(word, content)]
-        for o in occurances:
-            left_from = max(0, o - 150)
-            left_to = o
-            right_from = o + len(word)
-            right_to = o + min(len(content), len(word) + 150)
-            
+    docs = nyt.get_raw_docs(date_from,date_to)
+
+    for doc in docs:
+
+        #Check for single match in a kinda weird way
+        matches = textract.matches.regex_matches(doc,term)
+
+        found = False
+        for m in matches:
+            found = True
+            break
+        if not found: continue
+
+        #Find KWIQ matches
+        matches = textract.kwic.keyword_in_context(doc,word,ignore_case=True,window_width=100)
+        for m in matches:
             occurance_dict = {}
-            occurance_dict["left"] = content[left_from:left_to]
-            occurance_dict["kwiq"] = word
-            occurance_dict["right"] = content[right_from:right_to]
-            occurance_dict["url"] = url
+            occurance_dict["left"] = m[0]
+            occurance_dict["kwiq"] = m[1]
+            occurance_dict["right"] = m[2] 
+            occurance_dict["url"] = doc.user_data["url"]
             output.append(occurance_dict)
     return jsonify(result=output)
 
 
 @app.route('/_search_term')
 def search_term():
-    global all_data
-    #Intialize tool when it hasnt been done yet
-    #if type(all_data) == type(None):
-    #    print("Loding data!")
-    #    with open('pd_data.pck', 'rb') as f:
-    #        pass
-            #all_data = pickle.load(f)
-            #print(all_data.head(10))
-
     output = {}
     
     term = request.args.get('term', 0, type=str)
@@ -99,7 +98,10 @@ def search_term():
     date_to = request.args.get('to', 0, type=str)
     count = int(request.args.get('count', 0, type=str))
 
+    query_id = str(term) + str(interval) + str(date_from) + str(date_to) + str(count)
 
+    if query_id in query_cache:
+        return jsonify(result=query_cache[query_id])
 
     if term =="": return jsonify({})
 
@@ -114,9 +116,9 @@ def search_term():
     date_to = pd.to_datetime(date_to).tz_localize(None)
 
     print("load data into memory")
-    doc_list = nyt.get_data_between_pd(term,date_from,date_to)
-    print("group")
-    doc_list = tools.group_dataframe_pd(doc_list,interval,date_from,date_to)
+    doc_list = nyt.get_data_between(term,date_from,date_to)
+    print("group data by date")
+    doc_list = tools.group_dataframe_pd(doc_list,interval,date_from,date_to) 
     print("calculate statistics")
     #names, vectors = co.calculate_td_idf_scores2(doc_list["data"].to_list())
     #tft, cv = co.calculate_idf_scores(doc_list["data"].to_list())
@@ -127,51 +129,50 @@ def search_term():
     for i in range(0,len(doc_list)):
         df = pd.DataFrame(vectors[i].T.todense(), index=names, columns=["tfidf"])
         topn = df.nlargest(count,"tfidf")
-        t = pd.to_datetime(doc_list.index[i])
+        t = pd.to_datetime(doc_list.index[i]) 
         key = str(t.year) + "-" + str(t.month).rjust(2,"0")
 
         column_data = {}
         date_from = pd.to_datetime(doc_list.index[i]).replace(day=1)
-        column_data["date_from"] =  date_from
+        column_data["date_from"] = date_from
         column_data["date_to"] = date_from + pd.DateOffset(months=interval)
 
         word_list = {}
         for w in list(topn.index):
             word_data = {}
-            word_data["position"] = [0,0]
+            word_data["position"] = list(we.get_embedding(embedding_data,embedding_vocab,w))
             word_data["tfidf"] = str(topn.at[w,"tfidf"])
-            if w in glove_words:
-                idx = glove_words.index(w) 
-                word_data["position"] = list(glove_data[idx])
             word_list[w] = word_data
         column_data["words"] = word_list
         output[key] = column_data
 
+    #Save to query_cache dict 
+    query_cache[query_id] = output
+    with open('query_cache.pck', 'wb') as f:
+        pickle.dump(query_cache, f)
+
+    #Send off response
     return jsonify(result=output)
 
 if __name__ == "__main__":
-    #initialize_idf()
-    #nyt.woops()
+    #initialize_idf() 
     #quit()
+    with open('query_cache.pck', 'rb') as f:
+        query_cache = pickle.load(f)
+
     with open('idf_data.pck', 'rb') as f:
         data = pickle.load(f)
         tft = data[0]
         cv = data[1]
-        #print(data)
-        # print idf values 
-        #df_idf = pd.DataFrame(tft.idf_, index=cv.get_feature_names(),columns=["idf_weights"]) 
-        #df_idf = df_idf.sort_values(by=['idf_weights'])
-        #df_idf.to_csv("idf_values.csv")
 
-    with open('2d_data.pck', 'rb') as f:
+    with open('2d_data_numberbatch.pck', 'rb') as f:
         data = pickle.load(f)
-        glove_words = data[0]
-        glove_data = data[1]
-        #plt.scatter(glove_data[:, 0], glove_data[:, 1], s=1)
+        embedding_vocab = data[0]
+        embedding_data = data[1]
+        #plt.scatter(embedding_data[:, 0], embedding_data[:, 1], s=1)
         #plt.show()
         #print(data)
 
-    all_data = None
     
     app.run(debug=True)
     app.add_url_rule('/favicon.ico', redirect_to=url_for('static', filename='favicon.ico'))

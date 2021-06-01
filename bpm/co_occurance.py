@@ -15,14 +15,20 @@ from nltk.stem import WordNetLemmatizer
 
 #stopwords = stopwords.words('english')
 stopwords = [x for x in open('data/stopwords/ranksnl_large.txt','r').read().split('\n')]
+def dummy(doc):
+    return doc
 
-def calculate_idf_scores(documents):
+
+def calculate_idf_scores(documents,vocab=None):
     #instantiate CountVectorizer() 
+
     cv=CountVectorizer(
+        tokenizer=dummy,
+        preprocessor=dummy,
         stop_words=stopwords,
-        dtype = np.float32,
-        strip_accents = 'unicode',
-        ngram_range=(1,1),
+        dtype = np.int32,
+        #strip_accents = 'unicode',
+        #ngram_range=(1,1),
         min_df=2,
         #max_df=2.0
     ) 
