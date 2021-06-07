@@ -89,8 +89,9 @@ def search_term():
     date_from = request.args.get('from', 0, type=str)
     date_to = request.args.get('to', 0, type=str)
     count = int(request.args.get('count', 0, type=str))
+    deep = request.args.get('deep', 0, type=bool)
 
-    query_id = str(term) + str(interval) + str(date_from) + str(date_to) + str(count)
+    query_id = str(term) + str(interval) + str(date_from) + str(date_to) + str(count) + str(deep)
 
     if query_id in query_cache:
         return jsonify(result=query_cache[query_id])
@@ -102,7 +103,8 @@ def search_term():
         " interval:" + str(interval) + 
         " from:" + date_from + 
         " to:" + date_to + 
-        " count:" + str(count)
+        " count:" + str(count) + 
+        " deep:" + str(deep)
     )
     date_from = pd.to_datetime(date_from).tz_localize(None)
     date_to = pd.to_datetime(date_to).tz_localize(None)
@@ -142,7 +144,7 @@ def search_term():
             word_data = {}
             word_data["position"] = list(we.get_embedding(embedding_data,embedding_vocab,w))
             word_data["tfidf"] = str(topn.at[w,"tfidf"])
-            word_data["detail_data"] = get_tfidf_from_data(w,date_from,date_to)
+            if deep: word_data["detail_data"] = get_tfidf_from_data(w,date_from,date_to)
             word_list[w] = word_data
         column_data["words"] = word_list
         output[key] = column_data
@@ -158,7 +160,7 @@ def search_term():
 def get_tfidf_from_data(term,date_from,date_to):
     doc_list = None
     if nyt.last_query_df is not None and (date_from >= nyt.last_query_from) and (date_to <= nyt.last_query_to):
-        print("Using data of previous query")
+        #print("Using data of previous query")
         date_from = pd.to_datetime(date_from)
         date_to = pd.to_datetime(date_to)
 
@@ -172,10 +174,10 @@ def get_tfidf_from_data(term,date_from,date_to):
     single_list = itertools.chain.from_iterable(doc_list["textdata"])
     names, vectors = tf_idf.calculate_tf_idf_scores([single_list])
 
-    print(vectors)
+    #print(vectors)
     #print(names)
 
-    print("calculate topn") 
+    #print("calculate topn") 
 
     df = pd.DataFrame(vectors[0].T.todense(), index=names, columns=["tfidf"])
     topn = df.nlargest(5,"tfidf")
