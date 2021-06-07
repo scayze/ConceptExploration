@@ -1,5 +1,10 @@
 # %%
 import spacy
+nlp = spacy.load("en_core_web_sm")
+#%%
+nlp.from_disk('project.nlp')
+
+#%%
 from spacy.tokens import DocBin
 
 import os
@@ -11,8 +16,6 @@ from textacy import extract
 
 import bpm.tf_idf as tf_idf
 
-nlp = spacy.load("en_core_web_sm")
-nlp.from_disk('project.nlp')
 
 path = 'data/nyt_corpus/data/2000/01.spacy'
 

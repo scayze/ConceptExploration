@@ -1,13 +1,5 @@
-vaex-core
-vaex-hdf5
 pandas
-numpy
-sklearn
-scipy
-spacy
-matplotlib
-cmake
-MulticoreTSNE
-nltk
 flask
 textacy
+regex
+MulticoreTSNE

@@ -23,16 +23,6 @@ embedding_data = None
 
 query_cache = {}
 
-def initialize_w2v():
-    pass
-
-def initialize_idf():
-    print("load all data")
-    all_data = nyt.get_data_between(pd.to_datetime("1970"),pd.to_datetime("2010"))
-    print("get idf scores")
-    a, b = tf_idf.calculate_idf_scores(all_data["textdata"])
-    with open('idf_data.pck', 'wb') as f:
-        pickle.dump([a,b], f)
 
 @app.route('/')
 def index():
@@ -200,7 +190,7 @@ if __name__ == "__main__":
         query_cache = {}
 
     #Load IDF values from disk
-    tf_idf.from_disk()
+    tf_idf.initialize_idf()
 
     with open('2d_data_numberbatch.pck', 'rb') as f:
         data = pickle.load(f)

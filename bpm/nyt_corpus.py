@@ -11,6 +11,7 @@ import pandas as pd
 
 import spacy
 import spacy.attrs
+
 from spacy.tokens import DocBin
 
 from textacy import extract

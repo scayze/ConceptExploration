@@ -4,8 +4,9 @@
 *.hdf5
 /data/nyt_corpus
 /data/glove
-/bpm-env
+/.bpm-env
 /dask
 /.vscode
 /.bp-env
+/.env
 __pycache__/

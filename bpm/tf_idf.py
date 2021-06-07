@@ -1,6 +1,8 @@
 import numpy as np
 import pickle
-import dill
+import bpm.nyt_corpus as nyt
+import pandas as pd
+import os
 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer 
@@ -10,13 +12,20 @@ stopwords = [x for x in open('data/stopwords/ranksnl_large.txt','r').read().spli
 tfidf_transformer = None
 count_vectorizer = None
 
-def from_disk():
+def initialize_idf():
     global tfidf_transformer
     global count_vectorizer
-    with open('idf_data.pck', 'rb') as f:
-        data = pickle.load(f)
-        tfidf_transformer = data[0]
-        count_vectorizer = data[1]
+    if os.path.isfile('idf_data.pck'):
+        with open('idf_data.pck', 'rb') as f:
+            data = pickle.load(f)
+            tfidf_transformer = data[0]
+            count_vectorizer = data[1]
+    else:
+        print("Generating IDF data from scratch")
+        data = nyt.get_data_between(pd.to_datetime("1970"),pd.to_datetime("2010"))
+        a, b = calculate_idf_scores(data["textdata"])
+        with open('idf_data.pck', 'wb') as f:
+            pickle.dump([a,b], f)
 
 def _dummy(x):
     return x
@@ -32,10 +41,10 @@ def calculate_idf_scores(documents,vocab=None):
         min_df=2,
     ) 
     # this steps generates word counts for the words in your docs 
-    print("count fit")
+    print("Count fit")
     word_count_vector=cv.fit_transform(documents)
 
-    print("tfidf fit")
+    print("TF-IDF fit")
     tfidf_transformer=TfidfTransformer(smooth_idf=True,use_idf=True) 
     tfidf_transformer.fit(word_count_vector)
 
