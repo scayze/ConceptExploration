@@ -16,6 +16,7 @@ $(function() {
         from: $('#datefrom').val(),
         to: $('#dateto').val(),
         count: $('#resultcount').val(),
+        deep: true
         }, function(data) {
             updateGraph(data.result)
         });
@@ -32,6 +33,7 @@ $(function() {
         from: current_date_from,
         to: current_date_to,
         count: 5,
+        deep: false,
         }, function(data) {
             updateStarglyph(data.result)
         });
@@ -80,7 +82,7 @@ function updateStarglyph(data) {
             glyphdata[word] = word_list_dict[word].tfidf
         }
         //Create starglyph
-        create_glyph_circle(tab,glyphdata)
+        create_glyph_circle(tab,word_list_dict)
         break //There should not be more than one column anyway
     }
 }
@@ -119,8 +121,8 @@ function updateConcordance(data) {
 
 function position_to_color(pos2d) {
     //Clamp values to bettter fit data in colormap, creating more varied colors
-    var xrange = [-0.3,0.8]
-    var yrange = [-0.4,0.6]
+    var xrange = [-0.4,0.7]
+    var yrange = [-0.5,0.5]
     pos_x = Math.max( xrange[0], Math.min(pos2d[0], xrange[1]))
     pos_y = Math.max( yrange[0], Math.min(pos2d[1], yrange[1]))
     Color2D.ranges = {x: xrange, y: yrange}; 
@@ -289,6 +291,7 @@ function updateGraph(data) {
 function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
     pointstring = ""
     linepath = ""
+    gradientpath = ""
 
     var keys =  Object.keys(dict)
     var a_step = 2*Math.PI / keys.length // The angle between each element in the starglyph
@@ -296,11 +299,12 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
     var centerpoint = "M" + cx.toString() + " " + cy.toString() + " "
     linepath += centerpoint + " "
     
-
+    var color_list = []
     for(var i = 0; i<keys.length; i++) {
         var key = keys[i]
         var tfidf = dict[key].tfidf
         var color = position_to_color(dict[key].position)
+        color_list.push(color)
 
         var a = a_step * i 
         
@@ -309,6 +313,10 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
         py = cy + (r*tfidf) * Math.sin(a)
         point = px.toString() + "," + py.toString()
         pointstring += point + " "
+        if(i==0)
+            gradientpath += "M" + px.toString() + " " + py.toString() + " "
+        else 
+            gradientpath += "L" + px.toString() + " " + py.toString() + " "
 
         //Path for the light gray lines connecting center with circle radius
         px = cx + r * Math.cos(a)
@@ -337,18 +345,26 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
         }
 
     }
+    color_list.push(color_list[0])
     //Linepath needs to close off at the end
     linepath += "Z"
+    gradientpath += "Z"
 
 
     var path = layout.append("path")
         .attr("id","starglyphpath")
         .attr("d",linepath)
-
-
     var glyph = layout.append("polygon")
         .attr("id","starglyph")
         .attr("points",pointstring)
+
+    var gradient_path = layout.append("path")
+        .attr("id","starglyphgradient")
+        .attr("d",gradientpath)
+    generatePathGradient(d3.select(layout.node()),"#starglyphgradient",color_list)
+
+
+
         
 }
 

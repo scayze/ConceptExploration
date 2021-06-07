@@ -43,9 +43,9 @@
 
 #starglyph {
     fill: #e74c3c;
-    fill-opacity: 0.5;
+    fill-opacity: 0.25;
     stroke: #e74c3c;
-    stroke-width: 3;
+    stroke-width: 0;
 }
 
 svg.leader-line {

@@ -1,16 +1,17 @@
-// Code licnesed under "GNU General Public License, version 3". 
+// Code licensed under "GNU General Public License, version 3". 
 // https://bl.ocks.org/mbostock/4163057
 
-function generatePathGradient() {
-    var color = d3.interpolateRainbow;
-    var path = d3.select("path").remove();
+function generatePathGradient(svg,id,color) {
+    var color = d3.interpolateRgbBasis(color);;
+    var path = d3.select(id).remove();
+    var stroke_width = 3
 
-    d3.select("svg").selectAll("path")
-        .data(quads(samples(path.node(), 8)))
+    svg.selectAll(id)
+        .data(quads(samples(path.node(), 1)))
     .enter().append("path")
         .style("fill", function(d) { return color(d.t); })
         .style("stroke", function(d) { return color(d.t); })
-        .attr("d", function(d) { return lineJoin(d[0], d[1], d[2], d[3], 32); });
+        .attr("d", function(d) { return lineJoin(d[0], d[1], d[2], d[3], stroke_width); });
 
 }
 
