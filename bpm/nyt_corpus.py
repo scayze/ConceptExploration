@@ -1,11 +1,10 @@
-import sys
-sys.path.append("C:/Users/Manu/Documents/repos/D3Test/")
-
 import os
+import sys
 import regex as re
 import glob
 
-import bpm.co_occurance as co
+import bpm.tf_idf as tf_idf
+import bpm.tools as tools
 
 import xml.etree.ElementTree as ET
 import pandas as pd
@@ -18,6 +17,9 @@ from textacy import extract
 from functools import partial
 
 re_special_characters = re.compile(r"[^a-z]+")
+last_query_df = None
+last_query_from = None
+last_query_to = None
 
 def clean_corpus():
     path = 'data/nyt_corpus/data/'
@@ -87,7 +89,7 @@ def extract_terms(doc):
             include_types=["PERSON","ORG","NORP","FAC","GPE","LOC","PRODUCT","EVENT"]
         )
     )
-    return [term.text.lower() for term in terms if term.text.lower() not in co.stopwords]
+    return [term.text.lower() for term in terms if term.text.lower() not in tf_idf.stopwords]
 
 def get_raw_docs(date_from,date_to):
     print("LOADING RAW DOCS")
@@ -110,28 +112,32 @@ def get_raw_docs(date_from,date_to):
     
     return bin.get_docs(nlp.vocab)
 
-def get_data_between(term,date_from,date_to):
+def get_data_between(date_from,date_to):
+    global last_query_df
+    global last_query_from
+    global last_query_to
+
+
     docs = get_raw_docs(date_from,date_to)
 
     print("dropping")
     token_lists = []
     date_list = []
     url_list = []
-    if term=="":
-        for doc in docs:
-            tokens = extract_terms(doc)
-            token_lists.append(tokens)
-            date_list.append(doc.user_data["date"])
-            url_list.append(doc.user_data["url"])
-    else:
-        for doc in docs:
-            tokens = extract_terms(doc)
-            if term not in tokens: continue
-            token_lists.append(tokens)
     
-            date_list.append(doc.user_data["date"])
-            url_list.append(doc.user_data["url"])
+    for doc in docs:
+        tokens = extract_terms(doc)
+        token_lists.append(tokens)
+        date_list.append(doc.user_data["date"])
+        url_list.append(doc.user_data["url"])
+
     df = pd.DataFrame.from_dict({"date":date_list, "url":url_list, "textdata":token_lists})
     df = df.set_index("date")
-    df.index = pd.to_datetime(df.index)
+    tools.make_index_unique(df)
+    #df.index = pd.to_datetime(df.index)
+    print(df.info(memory_usage="deep"))
+    df.to_pickle("hahahahahha.pck")
+    last_query_df = df
+    last_query_to = date_to
+    last_query_from = date_from
     return df

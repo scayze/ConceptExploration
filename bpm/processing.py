@@ -18,7 +18,7 @@ def process_archieve(nlp,path = ""):
             if not inner_file.name.endswith(".xml"): continue
             # Extract single document
             content = tar.extractfile(inner_file).read().decode('utf8')
-            url, date, doc = nyt.read_nitf_file_vx(content,"pandas")
+            url, date, doc = nyt.read_nitf_file(content)
             # Append data
             if doc == "": continue
             meta = {"url": url, "date": date}
@@ -37,24 +37,3 @@ def process_archieve(nlp,path = ""):
     #print(nlp.config)
     nlp.to_disk("project.nlp")
     doc_bin.to_disk(path[:-4] + ".spacy")
-
-if __name__ == '__main__':
-    nlp = spacy.load("en_core_web_sm")
-    if os.path.isdir('project.nlp'):
-        nlp.from_disk('project.nlp')
-    
-    year_str = ["2000"]
-
-    for ys in year_str:
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/01.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/02.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/03.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/04.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/05.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/06.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/07.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/08.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/09.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/10.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/11.tgz")
-        process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/12.tgz")

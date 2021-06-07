@@ -10,3 +10,4 @@ cmake
 MulticoreTSNE
 nltk
 flask
+textacy

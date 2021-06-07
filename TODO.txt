@@ -1,0 +1,3 @@
+
+Until 9.6:
+    Rerun spacy with good stopword list

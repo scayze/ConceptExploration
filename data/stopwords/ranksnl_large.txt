@@ -3,6 +3,10 @@ $
 'll
 've
 a
+am
+am.
+a.m
+a.m.
 able
 about
 above
@@ -382,6 +386,10 @@ overall
 owing
 own
 p
+pm
+pm.
+p.m
+p.m.
 page
 pages
 part

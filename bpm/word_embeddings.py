@@ -53,7 +53,7 @@ def reduce_embeddings_TSNE(embeddings):
 def get_embedding(data,vocab,term):
     embedding_term = term.replace(" ","_")
     if embedding_term in vocab:
-        print("Return value for: " + term)    
+        #print("Return value for: " + term)    
         idx = vocab.index(embedding_term) 
         return data[idx]
     elif " " in term:
@@ -65,10 +65,10 @@ def get_embedding(data,vocab,term):
                 sub_word_embeddings.append(data[idx])
         if len(sub_word_embeddings) > 0:
             #Calculate the mean of the wordembeddings
-            print("Return mean for: " + term)    
+            #print("Return mean for: " + term)    
             return np.stack(sub_word_embeddings).mean(axis=0) 
     #If everything fails, return default position
-    print("Return default for: " + term)    
+    #print("Return default for: " + term)    
     return np.array([0.0,0.0]) #Maybe choose a specific color instead of middle.
 
 

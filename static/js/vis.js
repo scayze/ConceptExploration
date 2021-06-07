@@ -21,7 +21,7 @@ $(function() {
         });
         return false;
     });
-    /*
+    
     $('#starglyph-tab').bind('click', function() {
         var tab_body = d3.select("#content_starglyph")
         tab_body.selectAll("*").remove()
@@ -37,7 +37,7 @@ $(function() {
         });
         return false;
     });
-    */
+    
     $('#concordance-tab').bind('click', function() {
         var table_body = d3.select("#concordance_table")
         table_body.selectAll("*").remove()
@@ -53,6 +53,7 @@ $(function() {
         return false;
     });
 });
+
 
 function redraw_lines() {
     return
@@ -116,6 +117,47 @@ function updateConcordance(data) {
     }
 }
 
+function position_to_color(pos2d) {
+    //Clamp values to bettter fit data in colormap, creating more varied colors
+    var xrange = [-0.3,0.8]
+    var yrange = [-0.4,0.6]
+    pos_x = Math.max( xrange[0], Math.min(pos2d[0], xrange[1]))
+    pos_y = Math.max( yrange[0], Math.min(pos2d[1], yrange[1]))
+    Color2D.ranges = {x: xrange, y: yrange}; 
+    var rgb = Color2D.getColor(pos_x, pos_y)
+    //Convert color to css color value
+    var formatted_color = "rgb(" + rgb[0].toString() + ", " + rgb[1].toString() + ", " + rgb[2].toString() + ")" 
+    return formatted_color
+}
+
+function initialize_starglyph(svg,term,from,to) {
+    $.getJSON('/_search_term', {
+        term: term,
+        interval: $('#interval_dropdown').val(),
+        from: from,
+        to: to,
+        count: 5,
+    }, function(data) {
+        updateGraph(data.result)
+
+        for (let key in data) {
+            let column_dict = data[key]
+            let word_list_dict = column_dict.words
+            //console.log(word_dict)
+    
+            glyphdata = {}
+            for(let word of Object.keys(word_list_dict)) { 
+                //Random data for starglyph
+                glyphdata[word] = word_list_dict[word].tfidf
+            }
+            //Create starglyph
+            create_starglyph(svg,glyphdata,100,75,39,false)
+            break //There should not be more than one column anyway
+        }
+    });
+    return false;  
+}
+
 function updateGraph(data) {
     console.log(data)
     interval = d3.select("#graph")
@@ -154,18 +196,7 @@ function updateGraph(data) {
         //console.log(word_dict)
         for(let word of Object.keys(word_list_dict)) { 
             //Get 2D embedding of word
-            var data_2d = word_list_dict[word].position
-
-            //Clamp values to bettter fit data in colormap, creating more varied colors
-            var xrange = [-0.3,0.8]
-            var yrange = [-0.4,0.6]
-            data_2d[0] = Math.max( xrange[0], Math.min(data_2d[0], xrange[1]))
-            data_2d[1] = Math.max( yrange[0], Math.min(data_2d[1], yrange[1]))
-            Color2D.ranges = {x: xrange, y: yrange}; 
-            var rgb = Color2D.getColor(data_2d[0], data_2d[1])
-            //Convert color to css color value
-            var formatted_color = "rgb(" + rgb[0].toString() + ", " + rgb[1].toString() + ", " + rgb[2].toString() + ")" 
-
+            var formatted_color = position_to_color(word_list_dict[word].position)
             //Create a div which will contain each datapoint (circle+text)
             var cricle_div = col.append("div")
             var svg = cricle_div.append("svg")
@@ -175,8 +206,10 @@ function updateGraph(data) {
                 .style("margin", "auto")
                 .style("display", "block")
 
-            //Random data for starglyph
-            glyphdata = {"a": Math.random(), "b": Math.random(), "c": Math.random(), "d": Math.random(), "e": Math.random()}
+            //Get detail of current word to create starglyph
+            var detail_data = word_list_dict[word].detail_data
+            //Load data for starglyph from detail data
+
             //Create circle and starglyph
             circle = create_circle(svg,formatted_color,word) //#f3f3f3
             .on("click",function() {
@@ -185,8 +218,8 @@ function updateGraph(data) {
                 current_detail = word
                 showModal()
             })
-
-            create_starglyph(svg,glyphdata,100,75,39,false) //Starglyph is 1 pixel smaller in radius to compensate for border
+            //initialize_starglyph(svg,word,column_dict.date_from,column_dict.date_to)
+            create_starglyph(svg,detail_data,100,75,39,false) //Starglyph is 1 pixel smaller in radius to compensate for border
         }
     }
 
@@ -263,15 +296,17 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
     var centerpoint = "M" + cx.toString() + " " + cy.toString() + " "
     linepath += centerpoint + " "
     
+
     for(var i = 0; i<keys.length; i++) {
         var key = keys[i]
-        var val = dict[key]
+        var tfidf = dict[key].tfidf
+        var color = position_to_color(dict[key].position)
 
         var a = a_step * i 
         
         //Polygon points for the starglyph
-        px = cx + (r*val) * Math.cos(a)
-        py = cy + (r*val) * Math.sin(a)
+        px = cx + (r*tfidf) * Math.cos(a)
+        py = cy + (r*tfidf) * Math.sin(a)
         point = px.toString() + "," + py.toString()
         pointstring += point + " "
 

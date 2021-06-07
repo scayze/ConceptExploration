@@ -1,30 +1,22 @@
-import sys
-import time
+import os
 
-from numpy import extract
-sys.path.append("C:/Users/Manu/Documents/repos/D3Test/")
-
-import bpm.co_occurance as co
+import bpm.tf_idf as tf_idf
 import bpm.nyt_corpus as nyt
 import bpm.tools as tools
 import bpm.word_embeddings as we
-import matplotlib.pyplot as plt
 
 import pandas as pd
 from pandas.io import pickle
 
-from textacy import extract as textract
+from textacy import extract
 
 import pickle
-import regex as re
+import itertools
 
 from flask import Flask, json, jsonify, g, redirect, request, url_for, render_template, send_from_directory
 
 app = Flask(__name__)
 
-
-tft = None
-cv = None
 
 embedding_vocab = None
 embedding_data = None
@@ -36,9 +28,9 @@ def initialize_w2v():
 
 def initialize_idf():
     print("load all data")
-    all_data = nyt.get_data_between("",pd.to_datetime("1970"),pd.to_datetime("2010"))
+    all_data = nyt.get_data_between(pd.to_datetime("1970"),pd.to_datetime("2010"))
     print("get idf scores")
-    a, b = co.calculate_idf_scores(all_data["textdata"])
+    a, b = tf_idf.calculate_idf_scores(all_data["textdata"])
     with open('idf_data.pck', 'wb') as f:
         pickle.dump([a,b], f)
 
@@ -68,7 +60,7 @@ def find_matches():
     for doc in docs:
 
         #Check for single match in a kinda weird way
-        matches = textract.matches.regex_matches(doc,term)
+        matches = extract.matches.regex_matches(doc,term)
 
         found = False
         for m in matches:
@@ -77,7 +69,7 @@ def find_matches():
         if not found: continue
 
         #Find KWIQ matches
-        matches = textract.kwic.keyword_in_context(doc,word,ignore_case=True,window_width=100)
+        matches = extract.kwic.keyword_in_context(doc,word,ignore_case=True,window_width=100)
         for m in matches:
             occurance_dict = {}
             occurance_dict["left"] = m[0]
@@ -115,15 +107,22 @@ def search_term():
     date_from = pd.to_datetime(date_from).tz_localize(None)
     date_to = pd.to_datetime(date_to).tz_localize(None)
 
-    print("load data into memory")
-    doc_list = nyt.get_data_between(term,date_from,date_to)
+    doc_list = None
+    if nyt.last_query_df is not None and (date_from >= nyt.last_query_from) and (date_to <= nyt.last_query_to):
+        print("Using data of previous query")
+        doc_list = nyt.last_query_df
+        doc_list = doc_list.sort_index() #Not sure why it needs to be sorted *again* but here we are
+        doc_list = doc_list.loc[date_from:date_to]
+    else:
+        print("loading data anew")
+        doc_list = nyt.get_data_between(date_from,date_to)
+    print("filter data by term")
+    doc_list = doc_list.loc[doc_list["textdata"].apply(lambda x: term in x)]
     print("group data by date")
     doc_list = tools.group_dataframe_pd(doc_list,interval,date_from,date_to) 
     print("calculate statistics")
-    #names, vectors = co.calculate_td_idf_scores2(doc_list["data"].to_list())
-    #tft, cv = co.calculate_idf_scores(doc_list["data"].to_list())
 
-    names, vectors = co.calculate_tf_idf_scores(doc_list["textdata"], tft, cv)
+    names, vectors = tf_idf.calculate_tf_idf_scores(doc_list["textdata"])
     
     print("calculate topn")
     for i in range(0,len(doc_list)):
@@ -134,14 +133,16 @@ def search_term():
 
         column_data = {}
         date_from = pd.to_datetime(doc_list.index[i]).replace(day=1)
+        date_to = date_from + pd.DateOffset(months=interval)
         column_data["date_from"] = date_from
-        column_data["date_to"] = date_from + pd.DateOffset(months=interval)
+        column_data["date_to"] = date_to
 
         word_list = {}
         for w in list(topn.index):
             word_data = {}
             word_data["position"] = list(we.get_embedding(embedding_data,embedding_vocab,w))
             word_data["tfidf"] = str(topn.at[w,"tfidf"])
+            word_data["detail_data"] = get_tfidf_from_data(w,date_from,date_to)
             word_list[w] = word_data
         column_data["words"] = word_list
         output[key] = column_data
@@ -154,16 +155,50 @@ def search_term():
     #Send off response
     return jsonify(result=output)
 
-if __name__ == "__main__":
+def get_tfidf_from_data(term,date_from,date_to):
+    doc_list = None
+    if nyt.last_query_df is not None and (date_from >= nyt.last_query_from) and (date_to <= nyt.last_query_to):
+        print("Using data of previous query")
+        date_from = pd.to_datetime(date_from)
+        date_to = pd.to_datetime(date_to)
+
+        doc_list = nyt.last_query_df
+        doc_list = doc_list.sort_index()
+        doc_list = doc_list.loc[date_from:date_to]
+    else:
+        print("existing data wasnt loaded")
+    
+    doc_list = doc_list.loc[doc_list["textdata"].apply(lambda x: term in x)]
+    single_list = itertools.chain.from_iterable(doc_list["textdata"])
+    names, vectors = tf_idf.calculate_tf_idf_scores([single_list])
+
+    print(vectors)
+    #print(names)
+
+    print("calculate topn") 
+
+    df = pd.DataFrame(vectors[0].T.todense(), index=names, columns=["tfidf"])
+    topn = df.nlargest(5,"tfidf")
+
+    word_list = {}
+    for w in list(topn.index):
+        word_data = {}
+        word_data["position"] = list(we.get_embedding(embedding_data,embedding_vocab,w))
+        word_data["tfidf"] = str(topn.at[w,"tfidf"])
+        word_list[w] = word_data
+    return word_list
+
+if __name__ == "__main__":  
     #initialize_idf() 
     #quit()
-    with open('query_cache.pck', 'rb') as f:
-        query_cache = pickle.load(f)
+    if os.path.isfile('query_cache.pck'):
+        with open('query_cache.pck', 'rb') as f:
+            query_cache = pickle.load(f)
+    else:
+        query_cache = {}
 
-    with open('idf_data.pck', 'rb') as f:
-        data = pickle.load(f)
-        tft = data[0]
-        cv = data[1]
+    #Load IDF values from disk
+    tf_idf.from_disk()
 
     with open('2d_data_numberbatch.pck', 'rb') as f:
         data = pickle.load(f)
