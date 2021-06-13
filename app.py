@@ -106,7 +106,7 @@ def search_term():
     print("filter data by term")
     doc_list = doc_list.loc[doc_list["textdata"].apply(lambda x: term in x)]
     print("group data by date")
-    doc_list = tools.group_dataframe_pd(doc_list,interval,date_from,date_to) 
+    doc_list = tools.group_dataframe_pd(doc_list,interval,date_from) 
     print(doc_list)
     print("calculate statistics")
 
@@ -122,7 +122,7 @@ def search_term():
         key = str(t.year) + "-" + str(t.month).rjust(2,"0")
 
         column_data = {}
-        date_from = pd.to_datetime(doc_list.index[i]).replace(day=1)
+        date_from = pd.to_datetime(doc_list.index[i])
         date_to = date_from + pd.DateOffset(months=interval)
         column_data["date_from"] = date_from
         column_data["date_to"] = date_to

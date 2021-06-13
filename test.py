@@ -13,49 +13,25 @@ import bpm.tf_idf as tf_idf
 
 path = 'data/nyt_corpus/data/2000/01.spacy'
 #%%
-import editdistance
-print(editdistance.eval('dr. robinson', 'robinson'))
+import pandas as pd
 
-print(editdistance.eval('carbon cycle', 'carbon sinks'))
+def group_dataframe_pd(df):
+    grouped_df = df.groupby(pd.Grouper(freq="12MS", label="left", origin=pd.to_datetime("2000-01-01")))
+    df = grouped_df['url'].agg(textdata="count")
+    return pd.DataFrame(df)
 
-#%%
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer 
-import numpy as np
+df = pd.read_csv("whattheactualfuck.csv")
+df = df.set_index("date")
+df.index = pd.to_datetime(df.index)
 
-def _dummy(x):
-    return x
+print(df["url"])
+df = group_dataframe_pd(df)
 
-def calculate_idf_scores(documents,vocab=None):
-    #instantiate CountVectorizer() 
-    #No Ngram range as that is handled by textacy.extract over at processing.py
-    stopwords = [x for x in open('data/stopwords/ranksnl_large.txt','r').read().split('\n')]
-    cv=CountVectorizer(
-        tokenizer = _dummy,
-        preprocessor = _dummy,
-        stop_words = stopwords,
-        dtype = np.int32,
-        min_df=5,
-    ) 
-    # this steps generates word counts for the words in your docs 
-    print("Count fit")
-    word_count_vector=cv.fit_transform(documents)
+print("GROUPED:")
+print(df)
 
-    print("TF-IDF fit")
-    tfidf_transformer=TfidfTransformer(smooth_idf=True,use_idf=True) 
-    tfidf_transformer.fit(word_count_vector)
 
-    return tfidf_transformer, cv
 
-def calculate_tf_idf_scores(documents,count_vectorizer,tfidf_transformer):
-    # count matrix 
-    count_vector=count_vectorizer.transform(documents) 
-    
-    # tf-idf scores 
-    tf_idf_vector = tfidf_transformer.transform(count_vector)
-    feature_names = count_vectorizer.get_feature_names() 
-
-    return feature_names, tf_idf_vector
 
 #%%
 example_data = [

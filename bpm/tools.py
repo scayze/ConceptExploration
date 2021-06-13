@@ -28,16 +28,16 @@ def top_n_idx_sparse(matrix, n):
         top_n_idx.append(matrix.indices[le + np.argpartition(matrix.data[le:ri], -n_row_pick)[-n_row_pick:]])
     return top_n_idx
 
-def group_dataframe_pd(df,interval,date_from,date_to):
-    if date_from != "" and date_to != "":
-        #df.index=pd.to_datetime(df.index)
-        #df.sort_index()
-        #print(df.head(2))
-        df = df[(pd.to_datetime(df.index) >= date_from) & (pd.to_datetime(df.index) <= date_to)]
-        #df = df.loc[date_from:date_to]
-    grouped_df = df.groupby(pd.Grouper(freq=str(interval) + "M"))
+def group_dataframe_pd(df,interval,origin):
+    grouped_df = df.groupby(pd.Grouper(freq=str(interval) + "MS", label="left", origin=origin))
     df = grouped_df['textdata'].agg(textdata="sum")
     df["document_count"] = grouped_df['textdata'].agg(document_count="count")
+    # HACK: to get the group-by values back to time origin because APPAREntlY fucking pd.Grouper.origin is buggeeededddd
+    if interval == 1:
+        df.index = df.index.map(lambda x: pd.to_datetime(x).replace(day=1))
+    else:
+        df.index = df.index.map(lambda x: pd.to_datetime(x).replace(day=1,month=1))
+    
     return pd.DataFrame(df)
 
 # This method slightly alters the DateTimeIndex of a DataFrame

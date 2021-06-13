@@ -9,7 +9,6 @@ Optional:
 - Improve starglyph gradient generation
 - Add additional results when deleting nodes
 - Sortierte Starglypen (Traveling Salesman)
-- Fix bug for per year evaluation
 - Write generator to enable bigger queries
 - Edit distance für ergebnisse
 	- für suchen
@@ -22,6 +21,7 @@ Interactions:
 - Remove starglyphs from result :)
 
 Optional:
+- Fix bug for per year evaluation :)
 - Show Color in detail view :)
 	- line thickness percantage wise :)
 - Mehr informationen
