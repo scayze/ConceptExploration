@@ -9,4 +9,5 @@
 /.vscode
 /.bp-env
 /.env
+/.test-env
 __pycache__/

@@ -1,3 +1,31 @@
+Interactions:
+- Custom Term in detail View
+- Annotation
 
-Until 9.6:
-    Rerun spacy with good stopword list
+Other:
+-Host tool online
+
+Optional:
+- Improve starglyph gradient generation
+- Add additional results when deleting nodes
+- Sortierte Starglypen (Traveling Salesman)
+- Fix bug for per year evaluation
+- Write generator to enable bigger queries
+- Edit distance für ergebnisse
+	- für suchen
+	- für neuen term in detail view
+- Make connecting lines same color as circles
+
+
+Done:
+Interactions:
+- Remove starglyphs from result :)
+
+Optional:
+- Show Color in detail view :)
+	- line thickness percantage wise :)
+- Mehr informationen
+	- Dokument anzahlen :)
+	- Namen in detail view :)
+	- Tfidf wert für glyphen und detail :)
+- Semantic change value :)

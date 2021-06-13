@@ -16,6 +16,7 @@ from spacy.tokens import DocBin
 
 from textacy import extract
 from functools import partial
+import itertools
 
 re_special_characters = re.compile(r"[^a-z]+")
 last_query_df = None
@@ -96,7 +97,7 @@ def get_raw_docs(date_from,date_to):
     print("LOADING RAW DOCS")
     path = 'data/nyt_corpus/data/'
     nlp = spacy.load("en_core_web_sm")
-    nlp.from_disk('project.nlp')
+    nlp.from_disk('nlpnlpnlp')
     bin = DocBin(attrs=["LEMMA", "POS", "ENT_TYPE", "ENT_IOB"],store_user_data=True)
 
     for root, dirs, files in os.walk(path):
@@ -113,32 +114,84 @@ def get_raw_docs(date_from,date_to):
     
     return bin.get_docs(nlp.vocab)
 
+
+def get_data_generator(date_from,date_to):
+    print("LOADING RAW DOCS")
+    path = 'data/nyt_corpus/data/'
+
+    file_handles = []
+
+    for root, dirs, files in os.walk(path):
+        
+        for f in files:
+            if not f.endswith('.pck'): continue
+            p = os.path.join(root, f) #Get full path between the base path and the file
+            date = pd.to_datetime(p[len(path):-4]) #convert filepath to a datetime object.
+            if date < date_from or date >= date_to: continue #filter if date is not within [from:to]
+            print(date)
+            file_handles.append(p)
+    #single_list = itertools.chain.from_iterable(doc_list["textdata"])
+    return (itertools.chain.from_iterable(pd.read_pickle(handle)["textdata"]) for handle in file_handles)
+
 def get_data_between(date_from,date_to):
     global last_query_df
     global last_query_from
     global last_query_to
 
 
-    docs = get_raw_docs(date_from,date_to)
+    print("LOADING RAW DOCS")
+    path = 'data/nyt_corpus/data/'
+    df_list = []
 
-    print("dropping")
-    token_lists = []
-    date_list = []
-    url_list = []
-    
-    for doc in docs:
-        tokens = extract_terms(doc)
-        token_lists.append(tokens)
-        date_list.append(doc.user_data["date"])
-        url_list.append(doc.user_data["url"])
+    for root, dirs, files in os.walk(path):
+        
+        for f in files:
+            if not f.endswith('.pck'): continue
+            p = os.path.join(root, f) #Get full path between the base path and the file
+            date = pd.to_datetime(p[len(path):-4]) #convert filepath to a datetime object.
+            if date < date_from or date >= date_to: continue #filter if date is not within [from:to]
+            print(date)
+            df = pd.read_pickle(p)
+            df_list.append(df)
 
-    df = pd.DataFrame.from_dict({"date":date_list, "url":url_list, "textdata":token_lists})
-    df = df.set_index("date")
+
+    df = pd.concat(df_list)
     tools.make_index_unique(df)
-    #df.index = pd.to_datetime(df.index)
-    print(df.info(memory_usage="deep"))
-    df.to_pickle("hahahahahha.pck")
     last_query_df = df
     last_query_to = date_to
     last_query_from = date_from
     return df
+
+def generate_term_dfs(date_from = pd.to_datetime("1970"), date_to = pd.to_datetime("2020")):
+    print("EXTRACTING DATA")
+    path = 'data/nyt_corpus/data/'
+    nlp = spacy.load("en_core_web_sm")
+    nlp.from_disk('nlpnlpnlp')
+    #bin = DocBin(attrs=["LEMMA", "POS", "ENT_TYPE", "ENT_IOB"],store_user_data=True)
+
+    for root, dirs, files in os.walk(path):
+        for f in files:
+            if not f.endswith('.spacy'): continue
+            p = os.path.join(root, f) #Get full path between the base path and the file
+
+            date = pd.to_datetime(p[len(path):-6]) #convert filepath to a datetime object.
+            if date < date_from or date >= date_to: continue #filter if date is not within [from:to]
+            print(date)
+
+            bin = DocBin(store_user_data=True).from_disk(p)
+            docs = bin.get_docs(nlp.vocab)
+
+            token_lists = []
+            date_list = []
+            url_list = []
+            for doc in docs:
+                tokens = extract_terms(doc)
+                token_lists.append(tokens)
+                date_list.append(doc.user_data["date"])
+                url_list.append(doc.user_data["url"])
+            
+            df = pd.DataFrame.from_dict({"date":date_list, "url":url_list, "textdata":token_lists})
+            df = df.set_index("date")
+            tools.make_index_unique(df)
+            new_filename = f.split(".")[0] +".pck"
+            df.to_pickle(os.path.join(root, new_filename))

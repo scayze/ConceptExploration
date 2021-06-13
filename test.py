@@ -1,9 +1,3 @@
-# %%
-import spacy
-nlp = spacy.load("en_core_web_sm")
-#%%
-nlp.from_disk('project.nlp')
-
 #%%
 from spacy.tokens import DocBin
 
@@ -18,86 +12,112 @@ import bpm.tf_idf as tf_idf
 
 
 path = 'data/nyt_corpus/data/2000/01.spacy'
+#%%
+import editdistance
+print(editdistance.eval('dr. robinson', 'robinson'))
+
+print(editdistance.eval('carbon cycle', 'carbon sinks'))
 
 #%%
-f = pd.to_datetime("2002-01-02")
-t = pd.to_datetime("2003-02-01")
-df = pd.read_pickle("hahahahahha.pck")
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer 
+import numpy as np
 
-print(df.index)
-#df.index = pd.to_datetime(df.index)
-#df = df.sort_index()
-df2 = df.loc[f:t]
-f2 = pd.to_datetime("2002-01-02")
-t2 = pd.to_datetime("2003-02-01")
-df2 = df[["url"]]
-df2.to_csv("ttestt.csv")
+def _dummy(x):
+    return x
 
+def calculate_idf_scores(documents,vocab=None):
+    #instantiate CountVectorizer() 
+    #No Ngram range as that is handled by textacy.extract over at processing.py
+    stopwords = [x for x in open('data/stopwords/ranksnl_large.txt','r').read().split('\n')]
+    cv=CountVectorizer(
+        tokenizer = _dummy,
+        preprocessor = _dummy,
+        stop_words = stopwords,
+        dtype = np.int32,
+        min_df=5,
+    ) 
+    # this steps generates word counts for the words in your docs 
+    print("Count fit")
+    word_count_vector=cv.fit_transform(documents)
+
+    print("TF-IDF fit")
+    tfidf_transformer=TfidfTransformer(smooth_idf=True,use_idf=True) 
+    tfidf_transformer.fit(word_count_vector)
+
+    return tfidf_transformer, cv
+
+def calculate_tf_idf_scores(documents,count_vectorizer,tfidf_transformer):
+    # count matrix 
+    count_vector=count_vectorizer.transform(documents) 
+    
+    # tf-idf scores 
+    tf_idf_vector = tfidf_transformer.transform(count_vector)
+    feature_names = count_vectorizer.get_feature_names() 
+
+    return feature_names, tf_idf_vector
 
 #%%
-f2 = pd.to_datetime("2002-01-02")
-t2 = pd.to_datetime("2003-02-01")
+example_data = [
+    ["said","ivey"],
+    ["ivey","peanuts"],
+    ["a.m. appointment","appointment","peanuts"],
+    ["banana","apple"]
+]
 
-dates = ["2002-01-04","2002-01-14","2002-02-04","2002-02-04","2002-01-19"]
-data = ["aa","aaa","ab","ac","ad"]
-df3 = pd.DataFrame.from_dict({"date":dates, "data":data})
-df3 = df3.set_index("date")
-#df3 = df3.sort_index()
-df3.index = pd.to_datetime(df3.index)
-df4 = df3[f:t]
+tft, cv = calculate_idf_scores(example_data)
+print(cv.get_feature_names())
 
-print(df2)
-#%%
+calculate_tf_idf_scores(example_data[0:1],cv,tft)
+
+#%% Add Stopwords to spacy pipe
+import spacy
+nlp = spacy.load("en_core_web_sm")
+nlp.from_disk('nlpnlpnlp')
 
 custom_stopwords = [x for x in open('data/stopwords/ranksnl_large.txt','r').read().split('\n')]
+print(custom_stopwords)
+
 for w in custom_stopwords:
-    nlp.vocab[w].is_stop = True
-nlp.to_disk("project.nlp")
+    #nlp.vocab[w].is_stop = True
+    lex = nlp.vocab[w]
+    lex.is_stop = True
+nlp.to_disk("nlpnlpnlp")
 
-#%%
-tf_idf.from_disk()
-tf_idf.calculate_tf_idf_scores([["milk", "climate change"],[],["water","world","metal"]])
+
+# %% Generate term dfs
+import bpm.nyt_corpus as nyt
+import pandas as pd
+nyt.generate_term_dfs(date_from=pd.to_datetime("2002"))
+# %% HACK: Remove stopwords from term dfs
+import pandas as pd
+stopwords = set([x for x in open('data/stopwords/ranksnl_large.txt','r').read().split('\n')])
+
+def clean_terms(df):
+    df["textdata"] = df["textdata"].apply(lambda x:
+        [y for y in x
+        if not any(word in stopwords for word in y.split(" "))]
+    )
+    return df
+
+
+
+example_data = [["ivey said","ivey"],["ivey","peanuts"],["a.m. appointment","appointment"],["banana","apple"]]
+df = pd.DataFrame.from_dict({"textdata":example_data})
+print(df)
+df2 = clean_terms(df)
+
 
 # %%
+import pandas as pd
+path = 'data/nyt_corpus/data/'
+for root, dirs, files in os.walk(path):
+    for f in files:
+        if not f.endswith('.pck'): continue
+        p = os.path.join(root, f) #Get full path between the base path and the file
+        df = pd.read_pickle(p)
+        df = clean_terms(df)
+        print(p)
+        df.to_pickle(p)
 
-
-bin = DocBin(attrs=["LEMMA", "POS", "ENT_TYPE", "ENT_IOB"],store_user_data=True).from_disk(path)
-docs = list(bin.get_docs(nlp.vocab))
-en = textacy.load_spacy_lang("en_core_web_sm")
-
-textlist = ["peter loves icecream, peter likes ducks","peter is going to the mall to eat icecream","the mall is big and peter loves it"]
-docs = [textacy.make_spacy_doc(t, lang=en) for t in textlist]
-
-for d in docs:
-    print("_")
-    for t in nyt.extract_terms(d):
-        print(t.text)
-#for f in test:
-#    print(f)
-
-#%%
-result = tf_idf.get_tdidf(nlp,docs[1:4])
-
-# %%
-print(result[1])
-print("HUH")
-print(min(result[1]))
-print(tex_idf.vectorizer.terms_list)
-
-#%%
-nlp = spacy.load("en_core_web_sm")
-nlp.from_disk('project.nlp')
-doc = nlp(
-    "spaCy Doc or raw text in which to search for keyword. If a Doc, constituent text is grabbed via spacy.tokens.Doc.text. Note that spaCy annotations aren’t used at all here, they’re just a convenient owner of document text."
-)
-docs = list(nyt.get_raw_docs(pd.to_datetime("2000"),pd.to_datetime("2000-02")))
-found = extract.kwic.keyword_in_context(
-    docs[0],
-    "war",
-    ignore_case=True,
-    window_width=100,
-
-)
-for f in found:
-    print(f)
 # %%

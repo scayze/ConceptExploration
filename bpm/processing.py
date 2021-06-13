@@ -35,5 +35,5 @@ def process_archieve(nlp,path = ""):
         i+=1
         #print("Done: " + str(i))
     #print(nlp.config)
-    nlp.to_disk("project.nlp")
+    nlp.to_disk("nlpnlpnlp")
     doc_bin.to_disk(path[:-4] + ".spacy")

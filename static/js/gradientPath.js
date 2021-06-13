@@ -1,18 +1,17 @@
 // Code licensed under "GNU General Public License, version 3". 
 // https://bl.ocks.org/mbostock/4163057
 
-function generatePathGradient(svg,id,color) {
+function generatePathGradient(svg,id,color,stroke_width) {
     var color = d3.interpolateRgbBasis(color);;
     var path = d3.select(id).remove();
-    var stroke_width = 3
 
     svg.selectAll(id)
         .data(quads(samples(path.node(), 1)))
     .enter().append("path")
         .style("fill", function(d) { return color(d.t); })
         .style("stroke", function(d) { return color(d.t); })
-        .attr("d", function(d) { return lineJoin(d[0], d[1], d[2], d[3], stroke_width); });
-
+        .attr("d", function(d) { return lineJoin(d[0], d[1], d[2], d[3], stroke_width); })
+        .style("pointer-events", "none")
 }
 
 // Sample the SVG path uniformly with the specified precision.

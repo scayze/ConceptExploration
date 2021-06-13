@@ -17,12 +17,7 @@ from flask import Flask, json, jsonify, g, redirect, request, url_for, render_te
 
 app = Flask(__name__)
 
-
-embedding_vocab = None
-embedding_data = None
-
 query_cache = {}
-
 
 @app.route('/')
 def index():
@@ -79,7 +74,7 @@ def search_term():
     date_from = request.args.get('from', 0, type=str)
     date_to = request.args.get('to', 0, type=str)
     count = int(request.args.get('count', 0, type=str))
-    deep = request.args.get('deep', 0, type=bool)
+    deep = bool(request.args.get('deep', 0, type=int)) #HACK: type=bool doesnt work, thus passing int with 0=False and 1=True
 
     query_id = str(term) + str(interval) + str(date_from) + str(date_to) + str(count) + str(deep)
 
@@ -112,14 +107,17 @@ def search_term():
     doc_list = doc_list.loc[doc_list["textdata"].apply(lambda x: term in x)]
     print("group data by date")
     doc_list = tools.group_dataframe_pd(doc_list,interval,date_from,date_to) 
+    print(doc_list)
     print("calculate statistics")
 
     names, vectors = tf_idf.calculate_tf_idf_scores(doc_list["textdata"])
     
     print("calculate topn")
     for i in range(0,len(doc_list)):
-        df = pd.DataFrame(vectors[i].T.todense(), index=names, columns=["tfidf"])
-        topn = df.nlargest(count,"tfidf")
+        matrix = vectors[i]
+        #df = pd.DataFrame(vectors[i].T.todense(), index=names, columns=["tfidf"])
+        #topn = df.nlargest(count,"tfidf")
+        topn_idx = tools.top_n_idx_sparse(matrix,count)[0]
         t = pd.to_datetime(doc_list.index[i]) 
         key = str(t.year) + "-" + str(t.month).rjust(2,"0")
 
@@ -129,14 +127,21 @@ def search_term():
         column_data["date_from"] = date_from
         column_data["date_to"] = date_to
 
+        #print(names)
+        print(type(names))
+
         word_list = {}
-        for w in list(topn.index):
+        for idx in topn_idx:
+            w = names[idx]
             word_data = {}
-            word_data["position"] = list(we.get_embedding(embedding_data,embedding_vocab,w))
-            word_data["tfidf"] = str(topn.at[w,"tfidf"])
+            word_data["position"] = list(we.get_embedding(w))
+            word_data["tfidf"] = str(matrix[0,idx])
             if deep: word_data["detail_data"] = get_tfidf_from_data(w,date_from,date_to)
             word_list[w] = word_data
         column_data["words"] = word_list
+        doc_count = int(doc_list.iloc[i]["document_count"])
+        print(doc_count)
+        column_data["document_count"] = doc_count
         output[key] = column_data
 
     #Save to query_cache dict 
@@ -159,30 +164,28 @@ def get_tfidf_from_data(term,date_from,date_to):
         doc_list = doc_list.loc[date_from:date_to]
     else:
         print("existing data wasnt loaded")
+        print(date_from)
+        print(date_to)
+        print(nyt.last_query_from)
+        print(nyt.last_query_to)
     
     doc_list = doc_list.loc[doc_list["textdata"].apply(lambda x: term in x)]
     single_list = itertools.chain.from_iterable(doc_list["textdata"])
     names, vectors = tf_idf.calculate_tf_idf_scores([single_list])
 
-    #print(vectors)
-    #print(names)
-
-    #print("calculate topn") 
-
-    df = pd.DataFrame(vectors[0].T.todense(), index=names, columns=["tfidf"])
-    topn = df.nlargest(5,"tfidf")
+    matrix = vectors[0]
+    topn_idx = tools.top_n_idx_sparse(matrix,5)[0]
 
     word_list = {}
-    for w in list(topn.index):
+    for idx in topn_idx:
+        w = names[idx]
         word_data = {}
-        word_data["position"] = list(we.get_embedding(embedding_data,embedding_vocab,w))
-        word_data["tfidf"] = str(topn.at[w,"tfidf"])
+        word_data["position"] = list(we.get_embedding(w))
+        word_data["tfidf"] = str(matrix[0,idx])
         word_list[w] = word_data
     return word_list
 
 if __name__ == "__main__":  
-    #initialize_idf() 
-    #quit()
     if os.path.isfile('query_cache.pck'):
         with open('query_cache.pck', 'rb') as f:
             query_cache = pickle.load(f)
@@ -191,15 +194,7 @@ if __name__ == "__main__":
 
     #Load IDF values from disk
     tf_idf.initialize_idf()
-
-    with open('2d_data_numberbatch.pck', 'rb') as f:
-        data = pickle.load(f)
-        embedding_vocab = data[0]
-        embedding_data = data[1]
-        #plt.scatter(embedding_data[:, 0], embedding_data[:, 1], s=1)
-        #plt.show()
-        #print(data)
-
+    we.initialize_embeddings()
     
     app.run(debug=True)
     app.add_url_rule('/favicon.ico', redirect_to=url_for('static', filename='favicon.ico'))

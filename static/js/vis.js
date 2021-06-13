@@ -2,8 +2,10 @@ var current_term = "climate change"
 var current_detail = "climate change"
 var current_date_from = "2001-01"
 var current_date_to = "2001-10"
+var current_data = {}
 
 var lines = []
+var deleted_nodes = []
 
 window.requestAnimationFrame(redraw_lines);
 
@@ -11,34 +13,35 @@ $(function() {
     Color2D.setColormap(Color2D.colormaps.ZIEGLER, function() {}); 
     $('#submit').bind('click', function() {
         $.getJSON('/_search_term', {
-        term: $('#searchterm').val(),
-        interval: $('#interval_dropdown').val(),
-        from: $('#datefrom').val(),
-        to: $('#dateto').val(),
-        count: $('#resultcount').val(),
-        deep: true
+            term: $('#searchterm').val(),
+            interval: $('#interval_dropdown').val(),
+            from: $('#datefrom').val(),
+            to: $('#dateto').val(),
+            count: $('#resultcount').val(),
+            deep: 1, //HACK: Int instead of bool, bool is bugged
         }, function(data) {
             updateGraph(data.result)
         });
         return false;
     });
-    
+    /*
     $('#starglyph-tab').bind('click', function() {
         var tab_body = d3.select("#content_starglyph")
         tab_body.selectAll("*").remove()
 
         $.getJSON('/_search_term', {
-        term: current_detail,
-        interval: $('#interval_dropdown').val(),
-        from: current_date_from,
-        to: current_date_to,
-        count: 5,
-        deep: false,
+            term: current_detail,
+            interval: $('#interval_dropdown').val(),
+            from: current_date_from,
+            to: current_date_to,
+            count: 5,
+            deep: 0,
         }, function(data) {
             updateStarglyph(data.result)
         });
         return false;
     });
+    */
     
     $('#concordance-tab').bind('click', function() {
         var table_body = d3.select("#concordance_table")
@@ -58,7 +61,6 @@ $(function() {
 
 
 function redraw_lines() {
-    return
     for(l of lines) {
         l.position()
     }
@@ -67,24 +69,11 @@ function redraw_lines() {
 }
 
 //Function that is called when the starglyph tab is opened in the detail tab
-function updateStarglyph(data) {
+function updateStarglyph(data,color) {
     console.log(data)
     var tab = d3.select("#content_starglyph")
-    
-    for (let key in data) {
-        let column_dict = data[key]
-        let word_list_dict = column_dict.words
-        //console.log(word_dict)
-
-        glyphdata = {}
-        for(let word of Object.keys(word_list_dict)) { 
-            //Random data for starglyph
-            glyphdata[word] = word_list_dict[word].tfidf
-        }
-        //Create starglyph
-        create_glyph_circle(tab,word_list_dict)
-        break //There should not be more than one column anyway
-    }
+    tab.selectAll("*").remove()
+    create_glyph_circle(tab,data,color)
 }
 
 function updateConcordance(data) {
@@ -132,36 +121,9 @@ function position_to_color(pos2d) {
     return formatted_color
 }
 
-function initialize_starglyph(svg,term,from,to) {
-    $.getJSON('/_search_term', {
-        term: term,
-        interval: $('#interval_dropdown').val(),
-        from: from,
-        to: to,
-        count: 5,
-    }, function(data) {
-        updateGraph(data.result)
-
-        for (let key in data) {
-            let column_dict = data[key]
-            let word_list_dict = column_dict.words
-            //console.log(word_dict)
-    
-            glyphdata = {}
-            for(let word of Object.keys(word_list_dict)) { 
-                //Random data for starglyph
-                glyphdata[word] = word_list_dict[word].tfidf
-            }
-            //Create starglyph
-            create_starglyph(svg,glyphdata,100,75,39,false)
-            break //There should not be more than one column anyway
-        }
-    });
-    return false;  
-}
-
 function updateGraph(data) {
     console.log(data)
+    current_data = data
     interval = d3.select("#graph")
     searchterm = d3.select("#searchterm").property("value")
     
@@ -177,6 +139,10 @@ function updateGraph(data) {
     column_list = []
     
     for (let key in data) {
+
+        let column_dict = data[key]
+        let word_list_dict = column_dict.words
+
         var col = graph.append("div")
             .attr("class","col")
             .style("display","flex")
@@ -191,34 +157,39 @@ function updateGraph(data) {
             .attr("data-bs-placement","top")
             .attr("title","Tooltip on top")
 
+        var doc_count = col.append("small")
+            .attr("id","document_count")
+            .text("Documents: " + column_dict.document_count.toString())
+
         headers.push(header)
 
-        let column_dict = data[key]
-        let word_list_dict = column_dict.words
+
         //console.log(word_dict)
         for(let word of Object.keys(word_list_dict)) { 
+            //If the user explicitly deletes this word, remove it from the results
+            if (deleted_nodes.includes(word)) continue
             //Get 2D embedding of word
-            var formatted_color = position_to_color(word_list_dict[word].position)
+            let formatted_color = position_to_color(word_list_dict[word].position)
             //Create a div which will contain each datapoint (circle+text)
-            var cricle_div = col.append("div")
+            let cricle_div = col.append("div")
+
             var svg = cricle_div.append("svg")
                 .attr("id","circle_div")
                 .attr("width", 200)
                 .attr("height", 150)
                 .style("margin", "auto")
                 .style("display", "block")
-
             //Get detail of current word to create starglyph
-            var detail_data = word_list_dict[word].detail_data
+            let detail_data = word_list_dict[word].detail_data
             //Load data for starglyph from detail data
 
             //Create circle and starglyph
-            circle = create_circle(svg,formatted_color,word) //#f3f3f3
+            circle = create_circle(svg,formatted_color,word,word_list_dict[word].tfidf) //#f3f3f3
             .on("click",function() {
                 current_date_from = column_dict.date_from
                 current_date_to = column_dict.date_to
                 current_detail = word
-                showModal()
+                showModal(detail_data,formatted_color,word)
             })
             //initialize_starglyph(svg,word,column_dict.date_from,column_dict.date_to)
             create_starglyph(svg,detail_data,100,75,39,false) //Starglyph is 1 pixel smaller in radius to compensate for border
@@ -234,6 +205,11 @@ function updateGraph(data) {
             endPlug: "arrow1",
             color: 'rgb(0, 0, 0)',
             endPlugSize: 1,
+            middleLabel: LeaderLine.pathLabel({
+                text: "0.35",
+                color: "grey",
+                fontSize: "13.5px"
+            })
         });
         line.size = 2
         lines.push(line)
@@ -298,11 +274,19 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
 
     var centerpoint = "M" + cx.toString() + " " + cy.toString() + " "
     linepath += centerpoint + " "
+
+    //Normalize the glyph so it takes up 100% of circle
+    tfidf_list = []
+    for(var i = 0; i<keys.length; i++) {
+        var key = keys[i]
+        tfidf_list.push(dict[key].tfidf)
+    }
+    var local_multiplier = 1.0 / Math.max(...tfidf_list)
     
     var color_list = []
     for(var i = 0; i<keys.length; i++) {
         var key = keys[i]
-        var tfidf = dict[key].tfidf
+        var tfidf = dict[key].tfidf * local_multiplier
         var color = position_to_color(dict[key].position)
         color_list.push(color)
 
@@ -325,7 +309,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
         linepath += point + centerpoint
 
         //Add text at each endpoint of these path
-        var textoffset = 10
+        var textoffset = 15
         px = cx + (r+textoffset) * Math.cos(a)
         py = cy + (r+textoffset) * Math.sin(a)
 
@@ -334,14 +318,37 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
         else if (px < cx) textanchor = "end"
 
         if (showtext) {
-            layout.append("text")
+            let tfidf_text = layout.append("text")
+                .attr("x",px)
+                .attr("y",py + 15)
+                .attr("text-anchor",textanchor)
+                .attr("font-size",".8em")
+                .style("opacity",0.0)
+                .style("fill","grey")
+                //This is hands down the ugliest workaround ive ever written and i hate myself
+                .text("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 TF-IDF: " + parseFloat(dict[key].tfidf).toFixed(3) + "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0")
+
+            let title_text = layout.append("text")
                 .attr("x",px)
                 .attr("y",py)
                 .attr("text-anchor",textanchor)
-                .attr("stroke","51c5cf")
-                .attr("stroke-width","20px")
-                .attr("dy",".3em")
+                .attr("font-size","1em")
                 .text(key)
+                .on("mouseover", function() {
+                    tfidf_text.transition()
+                        .duration("150")
+                        .style("opacity",1.0)
+                })
+                .on("mouseout", function() {
+                    tfidf_text.transition()
+                        .duration("150")
+                        .style("opacity",0.0)
+                })
+
+                length = title_text.node().getComputedTextLength()
+                console.log(length)
+                tfidf_text.attr("x",px - length)
+            
         }
 
     }
@@ -354,22 +361,46 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
     var path = layout.append("path")
         .attr("id","starglyphpath")
         .attr("d",linepath)
+        .style("pointer-events", "none")
     var glyph = layout.append("polygon")
         .attr("id","starglyph")
         .attr("points",pointstring)
+        .style("pointer-events", "none")
 
     var gradient_path = layout.append("path")
         .attr("id","starglyphgradient")
         .attr("d",gradientpath)
-    generatePathGradient(d3.select(layout.node()),"#starglyphgradient",color_list)
-
-
-
+        .style("pointer-events", "none")
+    
+    
+    var line_width = 3
+    if (r > 100.0) line_width = 7
+    generatePathGradient(d3.select(layout.node()),"#starglyphgradient",color_list,line_width)
         
 }
 
 
-function create_circle(svg,color,text) {
+function create_circle(svg,color,text,tfidf) {
+
+    svg.append("text")
+        .attr("x","50%")
+        .attr("y","12%")
+        .attr("text-anchor","middle")
+        .attr("dy",".3em")
+        .style("pointer-events", "none")
+        .text(text)
+
+    let tfidf_text = svg.append("text")
+        .attr("id","tfidf-value")
+        .attr("x","50%")
+        .attr("y","93%")
+        .attr("text-anchor","middle")
+        .attr("font-size","0.8em")
+        .style("pointer-events", "none")
+        .style("fill","grey")
+        .style("opacity","0.0")
+        .text("TF-IDF: " + parseFloat(tfidf).toFixed(3))
+    
     circle = svg.append("circle")
         .attr("id","datacircle")
         .attr("class","section")
@@ -377,27 +408,24 @@ function create_circle(svg,color,text) {
         .attr('cy', 75)
         .attr('r', 40)
         .attr('stroke', color)
-        .attr("stroke-width","3px")
+        .attr("stroke-width", "4px")
         .attr('fill', "#f3f3f3")
         .attr('fill-opacity','50%')
         .attr('data-text',text)
-        //.attr("data-bs-toggle","modal")
-        //.attr("data-bs-target","#detailModal")
-
-    svg.append("text")
-        .attr("x","50%")
-        .attr("y","15%")
-        .attr("text-anchor","middle")
-        .attr("stroke","51c5cf")
-        .attr("stroke-width","20px")
-        .attr("dy",".3em")
-        .style("pointer-events", "none")
-        .text(text.split(" ").join("\n"))
-    
+        .on("mouseover", function() {
+            tfidf_text.transition()
+                .duration("150")
+                .style("opacity",1.0)
+        })
+        .on("mouseout", function() {
+            tfidf_text.transition()
+                .duration("150")
+                .style("opacity",0.0)
+        })
         return circle
 }
 
-function create_glyph_circle(layout,data) {
+function create_glyph_circle(layout,data,color) {
     var cricle_div = layout.append("div")
     var cx = 300
     var cy = 200
@@ -408,14 +436,14 @@ function create_glyph_circle(layout,data) {
         .style("margin", "auto")
         .style("display", "block")
     
-    create_starglyph(svg,data,cx,cy,r)
-
+    create_starglyph(svg,data,cx,cy,r-4)
+    //c = position_to_color()
     svg.append("circle")
         .attr('cx', cx)
         .attr('cy', cy)
         .attr('r', r)
-        .attr('stroke', 'black')
-        .attr("stroke-width","4px")
+        .attr('stroke', color)
+        .attr("stroke-width","8px")
         //.attr('fill', color)
         .attr('fill-opacity','0%')
         .on("click")
@@ -425,10 +453,18 @@ function openLink(url) {
     window.open(url, '_blank').focus();
 }
 
-function showModal() {
+function showModal(detailData,color,word) {
     var myModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
-    
+    $('#remove_button').bind('click', function() {
+        deleted_nodes.push(word)
+        
+        //d3.select("#modal-title").property("value","Detail View for:aaa " + word)
+        updateGraph(current_data)
+        myModal.hide()
+    });
+    $('#modal-title').html("Detail View for: " + "<b>" + word + "</b>")
     myModal.show()
     document.getElementById("starglyph-tab").click() //Emulate click on first tab element tor reset detail modal
+    updateStarglyph(detailData,color)
 }
 

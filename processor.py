@@ -4,14 +4,14 @@ import os
 
 if __name__ == '__main__':
     nlp = spacy.load("en_core_web_sm")
-    if os.path.isdir('project.nlp'):
-        nlp.from_disk('project.nlp')
+    if os.path.isdir('nlpnlpnlp'):
+        nlp.from_disk('nlpnlpnlp')
     else:
         custom_stopwords = [x for x in open('data/stopwords/ranksnl_large.txt','r').read().split('\n')]
         for w in custom_stopwords:
             nlp.vocab[w].is_stop = True
 
-    year_str = ["1999","1998","1997","2001","2007"]
+    year_str = ["1991","1990","1989","1988","1987"]
 
     for ys in year_str:
         proc.process_archieve(nlp,"data/nyt_corpus/data/" + ys + "/01.tgz")

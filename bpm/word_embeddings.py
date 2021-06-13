@@ -2,6 +2,29 @@ import numpy as np
 from MulticoreTSNE import MulticoreTSNE as TSNE #from sklearn.manifold import TSNE 
 from sklearn.decomposition import PCA
 import pickle
+import os
+
+embedding_vocab = None
+embedding_data = None
+
+
+def initialize_embeddings():
+    global embedding_data
+    global embedding_vocab
+
+    filename = "2d_data_numberbatch.pck"
+
+    if os.path.isfile(filename):
+        with open(filename, 'rb') as f:
+            data = pickle.load(f)
+            embedding_vocab = data[0]
+            embedding_data = data[1]
+    else:
+        print("Generating word embeddings data from scratch")
+        e = load_embeddings("data/glove/numberbatch-en.txt")
+        embedding_vocab, embedding_data = reduce_embeddings_PCA(e)
+        with open(filename, 'wb') as f:
+            pickle.dump([embedding_vocab,embedding_data], f)
 
 def load_embeddings(filepath):
     embeddings= {}
@@ -50,19 +73,19 @@ def reduce_embeddings_TSNE(embeddings):
     return words, Y
 
 #Potentially do TFIDF reweighting when encountering new word
-def get_embedding(data,vocab,term):
+def get_embedding(term):
     embedding_term = term.replace(" ","_")
-    if embedding_term in vocab:
+    if embedding_term in embedding_vocab:
         #print("Return value for: " + term)    
-        idx = vocab.index(embedding_term) 
-        return data[idx]
+        idx = embedding_vocab.index(embedding_term) 
+        return embedding_data[idx]
     elif " " in term:
         sub_words = term.split(" ")
         sub_word_embeddings = []
         for sw in sub_words:
-            if sw in vocab: 
-                idx = vocab.index(sw) 
-                sub_word_embeddings.append(data[idx])
+            if sw in embedding_vocab: 
+                idx = embedding_vocab.index(sw) 
+                sub_word_embeddings.append(embedding_data[idx])
         if len(sub_word_embeddings) > 0:
             #Calculate the mean of the wordembeddings
             #print("Return mean for: " + term)    
@@ -72,10 +95,3 @@ def get_embedding(data,vocab,term):
     return np.array([0.0,0.0]) #Maybe choose a specific color instead of middle.
 
 
-def generate_embeddings():
-    e = load_embeddings("data/glove/numberbatch-en.txt")
-    words, Y = reduce_embeddings_PCA(e)
-
-
-    with open('2d_data_numberbatch.pck', 'wb') as f:
-        pickle.dump([words,Y], f)

@@ -19,6 +19,14 @@ def run_on_subset(func, data_subset):
 def parallelize_on_rows(data, func, num_of_processes=4):
     return parallelize(data, partial(run_on_subset, func), num_of_processes)
 
+# From https://stackoverflow.com/questions/49207275/finding-the-top-n-values-in-a-row-of-a-scipy-sparse-matrix
+def top_n_idx_sparse(matrix, n):
+    '''Return index of top n values in each row of a sparse matrix'''
+    top_n_idx = []
+    for le, ri in zip(matrix.indptr[:-1], matrix.indptr[1:]):
+        n_row_pick = min(n, ri - le)
+        top_n_idx.append(matrix.indices[le + np.argpartition(matrix.data[le:ri], -n_row_pick)[-n_row_pick:]])
+    return top_n_idx
 
 def group_dataframe_pd(df,interval,date_from,date_to):
     if date_from != "" and date_to != "":
@@ -27,8 +35,9 @@ def group_dataframe_pd(df,interval,date_from,date_to):
         #print(df.head(2))
         df = df[(pd.to_datetime(df.index) >= date_from) & (pd.to_datetime(df.index) <= date_to)]
         #df = df.loc[date_from:date_to]
-    df = df.groupby(pd.Grouper(freq=str(interval) + "M"))
-    df = df['textdata'].agg(sum)
+    grouped_df = df.groupby(pd.Grouper(freq=str(interval) + "M"))
+    df = grouped_df['textdata'].agg(textdata="sum")
+    df["document_count"] = grouped_df['textdata'].agg(document_count="count")
     return pd.DataFrame(df)
 
 # This method slightly alters the DateTimeIndex of a DataFrame
