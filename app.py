@@ -11,6 +11,7 @@ from pandas.io import pickle
 from textacy import extract
 
 import pickle
+import re
 import itertools
 
 from flask import Flask, json, jsonify, g, redirect, request, url_for, render_template, send_from_directory
@@ -38,30 +39,115 @@ def find_matches():
         " to:" + date_to
     )
 
+    query_id = "concordance" + str(term) + str(word) + str(date_from) + str(date_to)
+
+    if query_id in query_cache:
+        return jsonify(result=query_cache[query_id])
+
     date_from = pd.to_datetime(date_from).tz_localize(None)
     date_to = pd.to_datetime(date_to).tz_localize(None)
-    docs = nyt.get_raw_docs(date_from,date_to)
+    docs_per_month = nyt.get_raw_docs(date_from,date_to)
 
-    for doc in docs:
+    for month_docs in docs_per_month:
+        for doc in month_docs:
 
-        #Check for single match in a kinda weird way
-        matches = extract.matches.regex_matches(doc,term)
+            #Check for single match in a kinda weird way
+            matches = extract.matches.regex_matches(doc,term)
 
-        found = False
-        for m in matches:
-            found = True
-            break
-        if not found: continue
+            found = False
+            for m in matches:
+                found = True
+                break
+            if not found: continue
 
-        #Find KWIQ matches
-        matches = extract.kwic.keyword_in_context(doc,word,ignore_case=True,window_width=100)
-        for m in matches:
-            occurance_dict = {}
-            occurance_dict["left"] = m[0]
-            occurance_dict["kwiq"] = m[1]
-            occurance_dict["right"] = m[2] 
-            occurance_dict["url"] = doc.user_data["url"]
-            output.append(occurance_dict)
+            #Find KWIQ matches
+            matches = extract.kwic.keyword_in_context(doc,word,ignore_case=True,window_width=100)
+            for m in matches:
+                occurance_dict = {}
+                occurance_dict["left"] = m[0]
+                occurance_dict["kwiq"] = m[1]
+                occurance_dict["right"] = m[2] 
+                occurance_dict["url"] = doc.user_data["url"]
+                output.append(occurance_dict)
+            if len(output) > 15: break
+        if len(output) > 15: break
+
+    query_cache[query_id] = output
+    with open('query_cache.pck', 'wb') as f:
+        pickle.dump(query_cache, f)
+    
+    return jsonify(result=output)
+
+#TODO: /_search_term, /_search_custom_glyph and get_tfidf_from_data have lots of duplicate code. Unify or split in functions
+
+@app.route('/_search_custom_glyph')
+def search_custom_glyph():
+    output = {}
+    
+    term = request.args.get('term', 0, type=str)
+    glyph_terms = request.args.get('glyph_terms', 0, type=str)
+    date_from = request.args.get('from', 0, type=str)
+    date_to = request.args.get('to', 0, type=str)
+
+    #Split on commas, remove leading and trailing whitepsace from each term, and remove duplicate whitespace
+    glyph_terms = glyph_terms.lower().split(",")
+    for i in range(0,len(glyph_terms)):
+        glyph_terms[i] = glyph_terms[i].strip()
+        glyph_terms[i] = re.sub(' +', ' ', glyph_terms[i])
+
+    query_id = term + ",".join(glyph_terms) + str(date_from) + str(date_to)
+    if query_id in query_cache:
+        return jsonify(result=query_cache[query_id])
+
+    if term == "": return jsonify({})
+    if glyph_terms == []: return jsonify({})
+
+    app.logger.info('Request with' + 
+        ' term:' + term +
+        ' glyph_terms:' + ",".join(glyph_terms) +
+        " from:" + date_from + 
+        " to:" + date_to
+    )
+
+    date_from = pd.to_datetime(date_from).tz_localize(None)
+    date_to = pd.to_datetime(date_to).tz_localize(None)
+
+    doc_list = None
+    if nyt.last_query_df is not None and (date_from >= nyt.last_query_from) and (date_to <= nyt.last_query_to):
+        print("Using data of previous query")
+        doc_list = nyt.last_query_df
+        doc_list = doc_list.sort_index() #Not sure why it needs to be sorted *again* but here we are
+        doc_list = doc_list.loc[date_from:date_to]
+    else:
+        print("loading data anew")
+        doc_list = nyt.get_data_between(date_from,date_to)
+    print("filter data by term")
+    doc_list = doc_list.loc[doc_list["textdata"].apply(lambda x: term in x)]
+    single_list = itertools.chain.from_iterable(doc_list["textdata"])
+    print("calculate statistics")
+
+    names, vectors = tf_idf.calculate_tf_idf_scores([single_list])
+    
+    print("calculate topn")
+    matrix = vectors[0]
+    #topn_idx = tools.top_n_idx_sparse(matrix,count)[0]
+    # TODO: find the glyph_terms words
+
+    for term in glyph_terms:
+        if term not in names: continue
+        idx = names.index(term)
+        word_data = {}
+        word_data["position"] = list(we.get_embedding(term))
+        word_data["tfidf"] = str(matrix[0,idx])
+        output[term] = word_data
+    #TODO: Do i wanna show document counts in the starglpyh too??
+
+    #Save to query_cache dict 
+    query_cache[query_id] = output
+    with open('query_cache.pck', 'wb') as f:
+        pickle.dump(query_cache, f)
+
+    #Send off response
     return jsonify(result=output)
 
 
@@ -118,6 +204,7 @@ def search_term():
         #df = pd.DataFrame(vectors[i].T.todense(), index=names, columns=["tfidf"])
         #topn = df.nlargest(count,"tfidf")
         topn_idx = tools.top_n_idx_sparse(matrix,count)[0]
+
         t = pd.to_datetime(doc_list.index[i]) 
         key = str(t.year) + "-" + str(t.month).rjust(2,"0")
 
@@ -126,9 +213,6 @@ def search_term():
         date_to = date_from + pd.DateOffset(months=interval)
         column_data["date_from"] = date_from
         column_data["date_to"] = date_to
-
-        #print(names)
-        print(type(names))
 
         word_list = {}
         for idx in topn_idx:

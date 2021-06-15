@@ -48,7 +48,20 @@
             <div class="modal-body" id="modal-view">
                 <div class="tab-content" id="myTabContent1" >
                     <div class="tab-pane fade show active" id="content_starglyph" role="tabpanel" aria-labelledby="starglyph-tab">
-                        <p>Raw denim you probably haven't heard of them jean shorts Austin. Nesciunt tofu stumptown aliqua, retro synth master cleanse. Mustache cliche tempor.</p>
+                        <form>
+                            <div class="form-group row">
+                                <div class="col-sm-11">
+                                    <label for="searchterm">Starglyph Terms</label>
+                                    <input class="form-control" id="glyphterms" type="text" placeholder="Search the Data" />
+                                </div>  
+                                <div class="col-sm-1"> 
+                                    <label for="submit"></label>
+                                    <button class="btn btn-primary form-select" type="button" id="glyph-submit">Search</button>
+                                </div> 
+                            </div>
+                        </form>
+                        <div id="starglpyh-div">
+                        </div>
                     </div>
                     <div class="tab-pane fade" id="content_concordance" role="tabpanel" aria-labelledby="concordance-tab"> 
                         <table class="table table-bordered cut-off" style="width: 100%; table-layout: fixed" >

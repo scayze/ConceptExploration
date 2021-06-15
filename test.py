@@ -12,6 +12,19 @@ import bpm.tf_idf as tf_idf
 
 
 path = 'data/nyt_corpus/data/2000/01.spacy'
+
+#%%
+import re
+input = "climate change, peter paaaan,    halloo dingbat, global  warming  ,peanuts,  peanuts  ,peanuts"
+terms = input.split(",")
+for i in range(0,len(terms)):
+    terms[i] = terms[i].strip()
+    terms[i] = re.sub(' +', ' ', terms[i])
+
+
+
+
+
 #%%
 import pandas as pd
 

@@ -1,26 +1,34 @@
 Interactions:
-- Custom Term in detail View
 - Annotation
 
-Other:
--Host tool online
-
-Optional:
-- Improve starglyph gradient generation
-- Add additional results when deleting nodes
-- Sortierte Starglypen (Traveling Salesman)
+Important:
 - Write generator to enable bigger queries
 - Edit distance für ergebnisse
-	- für suchen
-	- für neuen term in detail view
-- Make connecting lines same color as circles
+- Host tool online
+- Semantic change 
+
+Optional:
+- Edit Distance for queries
+- Dont Allow reclicking search after a query
+- Show toasts for internal error 
+- Improve starglyph gradient generation (Or just add draw mask around so glyphs dont overshoot)
+- Add additional results when deleting nodes
+- Sortierte Starglypen (Traveling Salesman)
 
 
 Done:
 Interactions:
+- Anpassen detail View :)
 - Remove starglyphs from result :)
 
+
+Important:
+- Actually sort circles by tfidf :)
+
+
 Optional:
+- Grow entire circle not just radius on hover :)
+- Query cache for concordance :)
 - Fix bug for per year evaluation :)
 - Show Color in detail view :)
 	- line thickness percantage wise :)
@@ -28,4 +36,5 @@ Optional:
 	- Dokument anzahlen :)
 	- Namen in detail view :)
 	- Tfidf wert für glyphen und detail :)
-- Semantic change value :)
+- Make connecting lines same color as circles :)
+

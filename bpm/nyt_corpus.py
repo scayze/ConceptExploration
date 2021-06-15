@@ -91,15 +91,15 @@ def extract_terms(doc):
             include_types=["PERSON","ORG","NORP","FAC","GPE","LOC","PRODUCT","EVENT"]
         )
     )
-    return [term.text.lower() for term in terms if term.text.lower() not in tf_idf.stopwords]
+    return [term.text.lower() for term in terms]
 
 def get_raw_docs(date_from,date_to):
     print("LOADING RAW DOCS")
     path = 'data/nyt_corpus/data/'
     nlp = spacy.load("en_core_web_sm")
     nlp.from_disk('nlpnlpnlp')
-    bin = DocBin(attrs=["LEMMA", "POS", "ENT_TYPE", "ENT_IOB"],store_user_data=True)
 
+    file_handles = []
     for root, dirs, files in os.walk(path):
         
         for f in files:
@@ -108,11 +108,13 @@ def get_raw_docs(date_from,date_to):
             date = pd.to_datetime(p[len(path):-6]) #convert filepath to a datetime object.
             if date < date_from or date >= date_to: continue #filter if date is not within [from:to]
             print(date)
-            new_bin = DocBin().from_disk(p)
-            new_bin.store_user_data=True
-            bin.merge(new_bin) #Merge DocBins
+            file_handles.append(p)
     
-    return bin.get_docs(nlp.vocab)
+    return (
+        DocBin(store_user_data=True).from_disk(handle).get_docs(nlp.vocab)
+        for handle
+        in file_handles
+    )
 
 
 def get_data_generator(date_from,date_to):

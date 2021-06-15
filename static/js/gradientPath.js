@@ -6,10 +6,11 @@ function generatePathGradient(svg,id,color,stroke_width) {
     var path = d3.select(id).remove();
 
     svg.selectAll(id)
-        .data(quads(samples(path.node(), 1)))
+        .data(quads(samples(path.node(), 15)))
     .enter().append("path")
         .style("fill", function(d) { return color(d.t); })
         .style("stroke", function(d) { return color(d.t); })
+        .style("transform-origin", "50% 50%")
         .attr("d", function(d) { return lineJoin(d[0], d[1], d[2], d[3], stroke_width); })
         .style("pointer-events", "none")
 }
