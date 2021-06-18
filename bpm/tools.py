@@ -2,7 +2,7 @@ from multiprocessing import  Pool
 from functools import partial
 import pandas as pd
 import numpy as np
-
+import editdistance
 
 def parallelize(data, func, num_of_processes=4):
     data_split = np.array_split(data, num_of_processes)
@@ -39,6 +39,39 @@ def group_dataframe_pd(df,interval,origin):
         df.index = df.index.map(lambda x: pd.to_datetime(x).replace(day=1,month=1))
     
     return pd.DataFrame(df)
+
+def get_topn_filtered(matrix,names,term,count):
+    no_duplicates = False
+    topn_idx = []
+    duplicates = []
+
+    while no_duplicates == False:
+        no_duplicates = True
+        new_count = count + len(duplicates)
+        topn_idx = np.argpartition(matrix, -new_count)[-new_count:]
+
+        for i in range(0,topn_idx.size):
+            #Filter the searhterm itself if it exists in the results
+            if names[topn_idx[i]] == term:
+                if term not in duplicates: 
+                    duplicates.append(term)
+                    no_duplicates = False
+                    break
+            #Filter similar words with editdistance < 5
+            for j in range(i+1,topn_idx.size):
+                nameI = names[topn_idx[i]]
+                nameJ = names[topn_idx[j]]
+                dist = editdistance.eval(nameI,nameJ)
+                if dist < 5: 
+                    longer = nameI if len(nameI) < len(nameJ) else nameJ
+                    if longer not in duplicates: 
+                        duplicates.append(longer)
+                        no_duplicates = False
+    output = []
+    for i in topn_idx:
+        if names[i] not in duplicates:
+            output.append(i)
+    return output
 
 # This method slightly alters the DateTimeIndex of a DataFrame
 # by a couple nano seconds, such that the DateTimeIndex becomes unique.

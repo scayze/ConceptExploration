@@ -1,4 +1,6 @@
 #%%
+import itertools
+from scipy.sparse import linalg
 from spacy.tokens import DocBin
 
 import os
@@ -10,19 +12,118 @@ from textacy import extract
 
 import bpm.tf_idf as tf_idf
 
+#%%
+from datetime import date, timedelta
 
-path = 'data/nyt_corpus/data/2000/01.spacy'
+start_date = pd.to_datetime("2000-01")#.to_datetime64().astype("timedelta64[D]")
+end_date = pd.to_datetime("2003")#.to_datetime64().astype("timedelta64[D]")
+parts = list(pd.date_range(start_date, end_date, freq='12MS')) 
+
+for i in parts: print(i)
+#%%
+delta = np.timedelta64(12,"M").astype("timedelta64[D]")
+print(delta)
+print(start_date)
+while start_date <= end_date:
+    #print(start_date.strftime("%Y-%m-%d"))
+    start_date += delta
+    print(start_date)
 
 #%%
-import re
-input = "climate change, peter paaaan,    halloo dingbat, global  warming  ,peanuts,  peanuts  ,peanuts"
-terms = input.split(",")
-for i in range(0,len(terms)):
-    terms[i] = terms[i].strip()
-    terms[i] = re.sub(' +', ' ', terms[i])
+import os
+import pickle
+from collections import Counter
+import itertools
+import pandas as pd
+import bpm.tf_idf as tf
+import numpy as np
+
+tf.initialize_idf()
+
+#%%
+
+example_data = [
+    ["global warming","grizzly bear"],
+    ["bush","peanuts"],
+    ["global warming", "bush","climate change","peanuts"],
+    ["banana","apple"]
+]
+#%%
+import editdistance
+import numpy as np
+def get_top_n(matrix,names,term,count):
+    no_duplicates = False
+    topn_idx = []
+    duplicates = []
+
+    while no_duplicates == False:
+        no_duplicates = True
+        new_count = count + len(duplicates)
+        topn_idx = np.argpartition(matrix, -new_count)[-new_count:]
+
+        for i in range(0,topn_idx.size):
+            if names[topn_idx[i]] == term:
+                if term not in duplicates: 
+                    duplicates.append(term)
+                    no_duplicates = False
+                    break
+            for j in range(i+1,topn_idx.size):
+                nameI = names[topn_idx[i]]
+                nameJ = names[topn_idx[j]]
+                dist = editdistance.eval(nameI,nameJ)
+                if dist < 5: 
+                    longer = nameI if len(nameI) < len(nameJ) else nameJ
+                    if longer not in duplicates: 
+                        duplicates.append(longer)
+                        no_duplicates = False
+    output = []
+    for i in topn_idx:
+        if names[i] not in duplicates:
+            output.append(i)
+    return output
+    
 
 
+matrix = np.array([5,       16,     4,      32,      3,     1 ])
+names =           ["aaaaa","bbbbb","ccccc","ddddd","eeeee","fffff"]
 
+
+print("si",get_top_n(matrix,names,"aaaaa",5))
+
+#%%
+c = Counter()
+for data in example_data:
+    c.update(data)
+
+# tf-idf scores 
+n2, v2 = tf.calculate_tf_idf_scores_counter([c])
+n1, v1 = tf.calculate_tf_idf_scores([itertools.chain.from_iterable(example_data)])
+
+
+df = pd.DataFrame(v1[0].T.todense(), index=n1, columns=["tfidf"])
+topn = df.nlargest(5,"tfidf")
+print(topn)
+
+df = pd.DataFrame(v2[0], index=n2, columns=["tfidf"])
+topn = df.nlargest(5,"tfidf")
+print(topn)
+
+#%%^
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer 
+import numpy as np
+
+def _dummy(x):
+    return x
+
+cv=CountVectorizer(
+    tokenizer = _dummy,
+    preprocessor = _dummy,
+    stop_words = None,
+    dtype = np.int32,
+    min_df=1,
+)
+type(cv.fit_transform([example_data[2]]))
 
 
 #%%

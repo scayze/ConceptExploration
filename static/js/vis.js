@@ -9,9 +9,16 @@ var deleted_nodes = []
 
 window.requestAnimationFrame(redraw_lines);
 
+
+
 $(function() {
     Color2D.setColormap(Color2D.colormaps.ZIEGLER, function() {}); 
+    
+    //On clicking the submit button after putting in settings
     $('#submit').bind('click', function() {
+        //Disable the submit button until query is responded to
+        $('#submit').addClass('disabled');
+        //Query the server with the values put in the form fields
         $.getJSON('/_search_term', {
             term: $('#searchterm').val(),
             interval: $('#interval_dropdown').val(),
@@ -20,33 +27,59 @@ $(function() {
             count: $('#resultcount').val(),
             deep: 1, //HACK: Int instead of bool, bool is bugged
         }, function(data) {
+            $('#submit').removeClass('disabled');
+            if("message" in data) { //Little hacky way to check if the request failed
+                //Show a toast displaying the error
+                Toast.setPlacement(TOAST_PLACEMENT.BOTTOM_RIGHT);
+                Toast.create("Error: Invalid Searchterm", "The searchterm: " + data["message"] + " does not exist.",TOAST_STATUS.DANGER, 5000);
+                return
+            }
+            console.log(data)
+            //Update the graph with the response
             updateGraph(data.result)
         });
         return false;
     });
+
+    //On clicking the submit button in the detail view, after putting in custom starglyph terms
     $('#glyph-submit').bind('click', function() {
+        //Disable the submit button until query is responded to
+        $('#glyph-submit').addClass('disabled');
+        //Query the server with the values put in the form fields
         $.getJSON('/_search_custom_glyph', {
             term: current_detail,
             glyph_terms: $('#glyphterms').val(),
             from: current_date_from,
             to: current_date_to,
         }, function(data) {
+            $('#glyph-submit').removeClass('disabled');
+            if("message" in data) { //Little hacky way to check if the request failed
+                //Show a toast displaying the error
+                Toast.setPlacement(TOAST_PLACEMENT.BOTTOM_RIGHT);
+                Toast.create("Error: Invalid Searchterms", "The searchterm: " + data["message"] + " does not exist.",TOAST_STATUS.DANGER, 5000);
+                return
+            }
+            //Update the starglpyh, with the color it already has
             color = d3.select("#detail-glyph-circle").attr("stroke")
             updateStarglyph(data.result,color)
+            
         });
         return false;
     });
     
+    //On going to the concordance tab
     $('#concordance-tab').bind('click', function() {
         var table_body = d3.select("#concordance_table")
+        //Clear the previous concordance
         table_body.selectAll("*").remove()
-
+        //Query the server with the values put in the form fields
         $.getJSON('/_get_concordance', {
         term: current_term,
         word: current_detail,
         from: current_date_from,
         to: current_date_to,
         }, function(data) {
+            //Update the concordance view
             updateConcordance(data.result)
         });
         return false;
@@ -131,15 +164,14 @@ function updateGraph(data) {
     headers = []
     lines = []
     column_list = []
-    
 
-
-
+    //For each key in the data, generate a new column with the information in it
     for (let key in data) {
 
         let column_dict = data[key]
         let word_list_dict = column_dict.words
 
+        //Generate a column for each key
         var col = graph.append("div")
             .attr("class","col")
             .style("display","flex")
@@ -147,23 +179,21 @@ function updateGraph(data) {
         
         column_list.push(col)
         
+        //Generate the headline of the column
         var header = col.append("H4")
             .attr("id","column_header")
             .text(key)
-            .attr("data-bs-toggle", "tooltip")
-            .attr("data-bs-placement","top")
-            .attr("title","Tooltip on top")
-
-        var doc_count = col.append("small")
-            .attr("id","document_count")
-            .text("Documents: " + column_dict.document_count.toString())
 
         headers.push(header)
 
+        //Show the Document count for each column
+        col.append("small")
+            .attr("id","document_count")
+            .text("Documents: " + column_dict.document_count.toString())
+
+
         let keys = Object.keys(word_list_dict).sort(function(a, b) {
-                if (word_list_dict[a].tfidf < word_list_dict[b].tfidf ) return -1
-                if (word_list_dict[a].tfidf > word_list_dict[b].tfidf) return 1
-                return 0
+                return word_list_dict[a].tfidf - word_list_dict[b].tfidf
             }
         ).reverse()
         console.log(keys)
@@ -197,7 +227,6 @@ function updateGraph(data) {
                 })
             //initialize_starglyph(svg,word,column_dict.date_from,column_dict.date_to)
             create_starglyph(svg,detail_data,100,75,39,false) //Starglyph is 1 pixel smaller in radius to compensate for border
-            circle
         }
     }
 
@@ -231,10 +260,10 @@ function updateGraph(data) {
         let c_curr = column_list[i]
         let c_prev = column_list[i-1]
 
-        c_curr.selectAll("circle").each(function() {
+        c_curr.selectAll("#datacircle").each(function() {
             let e_curr = d3.select(this)
 
-            c_prev.selectAll("circle").each(function() {
+            c_prev.selectAll("#datacircle").each(function() {
                 let e_prev = d3.select(this)
                 if(e_curr.attr("data-text") === e_prev.attr("data-text")) {
 
@@ -274,7 +303,6 @@ function updateGraph(data) {
 function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
     pointstring = ""
     linepath = ""
-    gradientpath = ""
 
     var keys =  Object.keys(dict)
     var a_step = 2*Math.PI / keys.length // The angle between each element in the starglyph
@@ -289,6 +317,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
         var key = keys[i]
         tfidf_list.push(dict[key].tfidf)
     }
+    //Localy scale the starglyph so the biggest value is 1
     var local_multiplier = 1.0 / Math.max(...tfidf_list)
     
     var gradient_points_list = []
@@ -308,19 +337,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
         pointstring += point + " "
 
         //Polygon points for each 
-        var linewidth = 3
-        if (r > 100.0) line_width = 7
-        px1 = cx + (r*tfidf-linewidth) * Math.cos(a)
-        py1 = cy + (r*tfidf-linewidth) * Math.sin(a)
-
-        px2 = cx + (r*tfidf+linewidth) * Math.cos(a)
-        py2 = cy + (r*tfidf+linewidth) * Math.sin(a)
-        gradient_points_list.push([px1,py1,px2,py2])
-
-        if(i==0)
-            gradientpath += "M" + px.toString() + " " + py.toString() + " "
-        else 
-            gradientpath += "L" + px.toString() + " " + py.toString() + " "
+        gradient_points_list.push([px,py])
 
         //Path for the light gray lines connecting center with circle radius
         px = cx + r * Math.cos(a)
@@ -345,7 +362,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
                 .attr("font-size",".8em")
                 .style("opacity",0.0)
                 .style("fill","grey")
-                //This is hands down the ugliest workaround ive ever written and i hate myself
+                //HACK: This is hands down the ugliest workaround ive ever written and i hate myself
                 .text("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 TF-IDF: " + parseFloat(dict[key].tfidf).toFixed(3) + "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0")
 
             let title_text = layout.append("text")
@@ -366,82 +383,62 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
                         .style("opacity",0.0)
                 })
 
-                length = title_text.node().getComputedTextLength()
-                console.log(length)
-                tfidf_text.attr("x",px - length)
-            
+                //length = title_text.node().getComputedTextLength()
+                //console.log(length)
+                //tfidf_text.attr("x",px - length)
         }
-
     }
-    color_list.push(color_list[0])
+    
+    
     //Linepath needs to close off at the end
     linepath += "Z"
-    gradientpath += "Z"
-
-    /*
+    color_list.push(color_list[0])
     gradient_points_list.push(gradient_points_list[0])
-    for(var i=1; i<gradient_points_list.length; i++) {
-        var pstr = ""
-        pstr += gradient_points_list[i-1][0].toString() + "," + gradient_points_list[i-1][1] + " "
-        pstr += gradient_points_list[i-1][2].toString() + "," + gradient_points_list[i-1][3] + " "
-        pstr += gradient_points_list[i][2].toString() + "," + gradient_points_list[i][3] + " "
-        pstr += gradient_points_list[i][0].toString() + "," + gradient_points_list[i][1]
-
-
-        px1 = gradient_points_list[i-1][0].toString()
-        py1 = gradient_points_list[i-1][1].toString()
-        px2 = gradient_points_list[i][0].toString()
-        py2 = gradient_points_list[i][1].toString()
-
-        var uid = ("grad" + keys.join("") + tfidf_list.map(String).join("") + i.toString()).split(' ').join('')
-        var angleDeg = Math.atan2(py2 - py1, px2 - px1) * 180 / Math.PI;
-        var ligra = layout.append("linearGradient")
-            .attr("id",uid)
-            //.attr("gradientTransform","rotate(" + angleDeg.toString() + ")")
-            .attr("gradientUnits","userSpaceOnUse")
-            .attr("x1","0")
-            .attr("y1","0")
-            .attr("x2","0")
-            .attr("y2","1")
-        ligra.append("stop")
-            .attr("offset","0%")
-            .attr("stop-color",color_list[i-1])
-        ligra.append("stop")
-            .attr("offset","100%")
-            .attr("stop-color",color_list[i])
-        var grapo = layout.append("polygon")
-            .attr("points",pstr)
-            .style("fill","url(#" + uid +")")
-            //<linearGradient id="grad-ucgg-generated" gradientUnits="userSpaceOnUse" 
-            //x1="0%" y1="0%" x2="100%" y2="0%" gradientTransform="rotate(65)">
-            // <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
-            // <stop offset="100%" stop-color="#ff0000" stop-opacity="1"/>
-           //</linearGradient>
-    }
-    */
 
     var path = layout.append("path")
         .attr("id","starglyphpath")
         .attr("d",linepath)
-        .style("transform-origin", "50% 50%")
-        .style("pointer-events", "none")
+
     var glyph = layout.append("polygon")
         .attr("id","starglyph")
         .attr("points",pointstring)
-        .style("transform-origin", "50% 50%")
-        .style("pointer-events", "none")
 
-    var gradient_path = layout.append("path")
-        .attr("id","starglyphgradient")
-        .attr("d",gradientpath)
-        .style("transform-origin", "50% 50%")
-        .style("pointer-events", "none")
-    
-    
-    var line_width = 3
-    if (r > 100.0) line_width = 7
-    generatePathGradient(d3.select(layout.node()),"#starglyphgradient",color_list,line_width)
-        
+    for(var i=1; i<gradient_points_list.length; i++) {
+        px1 = gradient_points_list[i-1][0]
+        py1 = gradient_points_list[i-1][1]
+        px2 = gradient_points_list[i][0]
+        py2 = gradient_points_list[i][1]
+
+        //Generate a unique ID for the linear gradient to be referred by from the line
+        var uid = ("grad" + keys.join("") + i.toString()).split(' ').join('')
+
+        //HACK: find out if its a small starglyph or the detailview one, and set line_width depending on it
+        var line_width = 4
+        if (r > 100.0) line_width = 7
+
+        var linear_gradient = layout.append("linearGradient")
+            .attr("id",uid)
+            .attr("x1",px1)
+            .attr("y1",py1)
+            .attr("x2",px2)
+            .attr("y2",py2)
+            .attr("gradientUnits","userSpaceOnUse")
+        linear_gradient.append("stop")
+            .attr("offset","0%")
+            .attr("stop-color",color_list[i-1])
+        linear_gradient.append("stop")
+            .attr("offset","100%")
+            .attr("stop-color",color_list[i])
+
+        layout.append("line")
+            .attr("x1",px1)
+            .attr("y1",py1)
+            .attr("x2",px2)
+            .attr("y2",py2)
+            .style("stroke-width",line_width)
+            .style("stroke","url(#" + uid +")")
+            .style("pointer-events","none")
+    }
 }
 
 
@@ -472,11 +469,11 @@ function create_circle(svg,color,text,tfidf) {
         .attr('cx', 100)
         .attr('cy', 75)
         .attr('r', 40)
-        .attr('stroke', color)
-        .attr("stroke-width", "4px")
-        .attr('fill', "#f3f3f3")
-        .attr('fill-opacity','50%')
         .attr('data-text',text)
+        .style('stroke', color)
+        .style("stroke-width", "4px")
+        .style('fill', "#f3f3f3")
+        .style('fill-opacity','50%')
         .style("transform-origin", "50% 50%")
         .on("mouseover", function() {
             tfidf_text.transition()
@@ -516,11 +513,9 @@ function create_glyph_circle(layout,data,color) {
         .attr('cx', cx)
         .attr('cy', cy)
         .attr('r', r)
-        .attr('stroke', color)
-        .attr("stroke-width","8px")
-        //.attr('fill', color)
-        .attr('fill-opacity','0%')
-        .on("click")
+        .style('stroke', color)
+        .style("stroke-width","8px")
+        .style('fill-opacity','0%')
 }
 
 function openLink(url) {
@@ -528,20 +523,26 @@ function openLink(url) {
 }
 
 function showModal(detailData,color,word) {
-    var myModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
-    $('#remove_button').off() //Unbind all previous handlers
+    var detailModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
+
+    //Remove the starglyph on close, preventing from linearGradients being overriden at the small circles
+    var modalNode = document.getElementById('detailModal')
+    modalNode.addEventListener('hidden.bs.modal', function (event) {
+        d3.select("#starglpyh-div").selectAll("*").remove()
+    })
+
+    //Unbind all previous handlers, and add a new one for the current delete button
+    $('#remove_button').off() 
     $('#remove_button').bind('click', function() {
         deleted_nodes.push(word)
-        
-        //d3.select("#modal-title").property("value","Detail View for:aaa " + word)
         updateGraph(current_data)
-        myModal.hide()
+        detailModal.hide()
     });
     $('#modal-title').html("Detail View for: " + "<b>" + word + "</b>")
     
     starting_input = Object.keys(detailData).join(", ")
     $('#glyphterms').val(starting_input)
-    myModal.show()
+    detailModal.show()
     document.getElementById("starglyph-tab").click() //Emulate click on first tab element tor reset detail modal
     updateStarglyph(detailData,color)
 }

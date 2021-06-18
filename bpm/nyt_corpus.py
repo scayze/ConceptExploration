@@ -1,9 +1,8 @@
+from logging import Handler
 import os
 import sys
-import regex as re
 import glob
 
-import bpm.tf_idf as tf_idf
 import bpm.tools as tools
 
 import xml.etree.ElementTree as ET
@@ -18,11 +17,7 @@ from textacy import extract
 from functools import partial
 import itertools
 
-re_special_characters = re.compile(r"[^a-z]+")
-last_query_df = None
-last_query_from = None
-last_query_to = None
-
+# Just a function that cleans the corpus folder from unnecessary files i created at some point for testing and such
 def clean_corpus():
     path = 'data/nyt_corpus/data/'
     endings = [".spacy"]
@@ -32,24 +27,22 @@ def clean_corpus():
     while True:
         sys.stdout.write(question + prompt)
         choice = input()
-        if choice == "YES":
-            break
-        elif choice == "NO":
-            return
-        else:
-            sys.stdout.write("Please respond with 'yes' or 'no' " "(or 'y' or 'n').\n")
+        if choice == "YES": break
+        elif choice == "NO": return
+        else: sys.stdout.write("Please respond with 'yes' or 'no' " "(or 'y' or 'n').\n")
 
     for e in endings:
         files = glob.glob(path + '**/*' + e, recursive=True)
         
         for f in files:
             try:
-                print(f)
+                print("Removing file: ", f)
                 os.remove(f)
             except OSError as e:
                 print("Error: %s : %s" % (f, e.strerror))
 
 
+# Read an xml file from the corpus as string, and extract all relevant information
 def read_nitf_file(content):
     #Parse file contents
     tree = ET.fromstring(content)
@@ -76,6 +69,10 @@ def read_nitf_file(content):
     return pub_url, pub_date, "" #Return empty text if none was found
 
 
+# Extract all relevant features from a spacy document, and preprocess them.
+# Currently:
+#   Entities of type: ["PERSON","ORG","NORP","FAC","GPE","LOC","PRODUCT","EVENT"]
+#   2grams
 def extract_terms(doc):
     terms = extract.terms(  
         doc,
@@ -135,15 +132,10 @@ def get_data_generator(date_from,date_to):
     #single_list = itertools.chain.from_iterable(doc_list["textdata"])
     return (itertools.chain.from_iterable(pd.read_pickle(handle)["textdata"]) for handle in file_handles)
 
-def get_data_between(date_from,date_to):
-    global last_query_df
-    global last_query_from
-    global last_query_to
 
-
-    print("LOADING RAW DOCS")
+def get_data_generator_between(date_from,date_to):
     path = 'data/nyt_corpus/data/'
-    df_list = []
+    file_handles = []
 
     for root, dirs, files in os.walk(path):
         
@@ -152,24 +144,20 @@ def get_data_between(date_from,date_to):
             p = os.path.join(root, f) #Get full path between the base path and the file
             date = pd.to_datetime(p[len(path):-4]) #convert filepath to a datetime object.
             if date < date_from or date >= date_to: continue #filter if date is not within [from:to]
-            print(date)
-            df = pd.read_pickle(p)
-            df_list.append(df)
+            file_handles.append(p)
 
+    return (
+        pd.read_pickle(handle)
+        for handle 
+        in file_handles
+    )
 
-    df = pd.concat(df_list)
-    tools.make_index_unique(df)
-    last_query_df = df
-    last_query_to = date_to
-    last_query_from = date_from
-    return df
 
 def generate_term_dfs(date_from = pd.to_datetime("1970"), date_to = pd.to_datetime("2020")):
     print("EXTRACTING DATA")
     path = 'data/nyt_corpus/data/'
     nlp = spacy.load("en_core_web_sm")
     nlp.from_disk('nlpnlpnlp')
-    #bin = DocBin(attrs=["LEMMA", "POS", "ENT_TYPE", "ENT_IOB"],store_user_data=True)
 
     for root, dirs, files in os.walk(path):
         for f in files:

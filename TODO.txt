@@ -1,16 +1,19 @@
-Interactions:
-- Annotation
+erwartungen
+informationenerklärung 
+
+festlegen interview
+
+ausprobieren
+
+end interview
+discussion
+future work
 
 Important:
-- Write generator to enable bigger queries
-- Edit distance für ergebnisse
 - Host tool online
 - Semantic change 
 
 Optional:
-- Edit Distance for queries
-- Dont Allow reclicking search after a query
-- Show toasts for internal error 
 - Improve starglyph gradient generation (Or just add draw mask around so glyphs dont overshoot)
 - Add additional results when deleting nodes
 - Sortierte Starglypen (Traveling Salesman)
@@ -18,16 +21,21 @@ Optional:
 
 Done:
 Interactions:
+- Normalize Tfidf :)
 - Anpassen detail View :)
 - Remove starglyphs from result :)
 
 
 Important:
+- Edit distance für ergebnisse :)
+- Write generator to enable bigger queries :)
 - Actually sort circles by tfidf :)
 
 
 Optional:
+- Dont Allow reclicking search after a query :)
 - Grow entire circle not just radius on hover :)
+- Show toasts for incorrect queries :) 
 - Query cache for concordance :)
 - Fix bug for per year evaluation :)
 - Show Color in detail view :)
