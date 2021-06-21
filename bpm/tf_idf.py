@@ -11,36 +11,35 @@ from sklearn.feature_extraction.text import TfidfTransformer
 
 # Save transformer and vectorizer globally for access
 # (yeye, bad practice, i know)
-tfidf_transformer = None
-count_vectorizer = None
-
-# Function that calculates the n most similar words in the vocabulary to a given term
-# Currently not used in implementation
-def get_closest_n(term,n):
-    features = count_vectorizer.get_feature_names()
-    feature_distances = np.full(len(features),0,dtype=np.int8)
-    for i in range(0,len(features)):
-        feature_distances[i] = editdistance.eval(term, features[i])
-    idx = np.argpartition(feature_distances, n)
-    return [features[i] for i in idx[:n]]
+word2id = None
+id2word = None
+idf = None
 
 # Initialize the tf-idf value calculation by calculating all IDF values, 
 # Or loading them from disk if that has already been done.
 def initialize_idf():
-    global tfidf_transformer
-    global count_vectorizer
+    global word2id
+    global id2word
+    global idf
+
+    
     if os.path.isfile('idf_data.pck'):
         with open('idf_data.pck', 'rb') as f:
+            print("loading idf")
             data = pickle.load(f)
-            tfidf_transformer = data[0]
-            count_vectorizer = data[1]
+            print("loaded idf")
+            word2id = data[0]
+            idf = data[1]
+
+            id2word = {v: k for k, v in word2id.items()}  
     else:
         print("Generating IDF data from scratch")
-        data = nyt.get_data_generator(pd.to_datetime("1970"),pd.to_datetime("2020"))
+        data = nyt.get_doc_generator_between(pd.to_datetime("1970"),pd.to_datetime("2020"))
         #data = nyt.get_data_between(pd.to_datetime("1970"),pd.to_datetime("2020"))
-        tfidf_transformer, count_vectorizer = calculate_idf_scores(data)
+        count_vectorizer, tfidf_transformer = calculate_idf_scores(data)
         with open('idf_data.pck', 'wb') as f:
-            pickle.dump([tfidf_transformer,count_vectorizer], f)
+            pickle.dump([count_vectorizer.vocabulary_,tfidf_transformer.idf_], f)
+    id2word = {v: k for k, v in word2id.items()}  
 
 # dummy func to remove tokenization from CountVectorizer
 def _dummy(x):
@@ -67,31 +66,21 @@ def calculate_idf_scores(documents):
 
     return tfidf_transformer, cv
 
-def calculate_tf_idf_scores(documents):
-    # count matrix 
-    count_vector=count_vectorizer.transform(documents) 
-    
-    # tf-idf scores 
-    tf_idf_vector = tfidf_transformer.transform(count_vector)
-    feature_names = count_vectorizer.get_feature_names() 
-
-    return feature_names, tf_idf_vector
-
 # A Custom implementation to calculate TF-IDF values without CountVectorizer
 # Using Count vectorizer required having alld ata available at once for transform
 # Here we use Counter, which can incrementally count objects.
 def calculate_tf_idf_scores_counter(counters):
     vectors = []
     for c in counters:
-        vectorizer_vocab = count_vectorizer.vocabulary_
+        vectorizer_vocab = word2id
         for n in list(c.keys()):
             if n not in vectorizer_vocab:
                 del c[n]
 
-        tfs = np.zeros(tfidf_transformer.idf_.size)
+        tfs = np.zeros(idf.size)
         for word in c.keys():
             tfs[vectorizer_vocab[word]] = c[word]
-        tfidf = skp.normalize([np.multiply(tfs,tfidf_transformer.idf_)])[0]
+        tfidf = skp.normalize([np.multiply(tfs,idf)])[0]
         vectors.append(tfidf)
 
-    return count_vectorizer.get_feature_names(), vectors
+    return id2word, vectors

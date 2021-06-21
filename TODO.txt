@@ -1,23 +1,8 @@
-erwartungen
-informationenerklärung 
-
-festlegen interview
-
-ausprobieren
-
-end interview
-discussion
-future work
-
 Important:
-- Host tool online
-- Semantic change 
-
+Todo:
 Optional:
-- Improve starglyph gradient generation (Or just add draw mask around so glyphs dont overshoot)
 - Add additional results when deleting nodes
-- Sortierte Starglypen (Traveling Salesman)
-
+- Sorted Starglyphs
 
 Done:
 Interactions:
@@ -27,12 +12,15 @@ Interactions:
 
 
 Important:
+- Host tool online :)
+- Semantic change :)
 - Edit distance für ergebnisse :)
 - Write generator to enable bigger queries :)
 - Actually sort circles by tfidf :)
 
 
 Optional:
+- Improve starglyph gradient generation :)
 - Dont Allow reclicking search after a query :)
 - Grow entire circle not just radius on hover :)
 - Show toasts for incorrect queries :) 

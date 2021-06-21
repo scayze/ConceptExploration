@@ -10,7 +10,6 @@ var deleted_nodes = []
 window.requestAnimationFrame(redraw_lines);
 
 
-
 $(function() {
     Color2D.setColormap(Color2D.colormaps.ZIEGLER, function() {}); 
     
@@ -174,6 +173,7 @@ function updateGraph(data) {
         //Generate a column for each key
         var col = graph.append("div")
             .attr("class","col")
+            .attr("data-similarity",column_dict["similarity_to_next"])
             .style("display","flex")
             .style("flex-direction","column")
         
@@ -232,15 +232,16 @@ function updateGraph(data) {
 
     //Create dashed lines between headers to visualize semantic change
     for(var i=1; i<headers.length; i++) {
+        similarity = column_list[i-1].attr("data-similarity")
         var line = new LeaderLine(headers[i-1].node(), headers[i].node());
         line.setOptions({ 
             //size = 2,
-            dash: {len: Math.random()*50+10, gap: 5},
+            dash: {len: similarity*50+10, gap: 5},
             endPlug: "arrow1",
             color: 'rgb(0, 0, 0)',
             endPlugSize: 1,
             middleLabel: LeaderLine.pathLabel({
-                text: "0.35",
+                text: parseFloat(similarity).toFixed(2),
                 color: "grey",
                 fontSize: "12.5px",
                 outlineColor: ""
@@ -274,7 +275,7 @@ function updateGraph(data) {
 
                     line.setOptions({ 
                         endPlug: "behind",
-                        color: e_curr.attr("stroke"),
+                        color: e_curr.style("stroke"),
                         startSocket: 'right',
                         endSocket: 'left'
                     });
@@ -411,6 +412,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
 
         //Generate a unique ID for the linear gradient to be referred by from the line
         var uid = ("grad" + keys.join("") + i.toString()).split(' ').join('')
+        var uid = uid.replace(/\W/g, '')
 
         //HACK: find out if its a small starglyph or the detailview one, and set line_width depending on it
         var line_width = 4
@@ -431,6 +433,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
             .attr("stop-color",color_list[i])
 
         layout.append("line")
+            .attr("id","glyph-line")
             .attr("x1",px1)
             .attr("y1",py1)
             .attr("x2",px2)
@@ -438,6 +441,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
             .style("stroke-width",line_width)
             .style("stroke","url(#" + uid +")")
             .style("pointer-events","none")
+            .style("transform-origin", "50% 50%")
     }
 }
 
@@ -479,7 +483,7 @@ function create_circle(svg,color,text,tfidf) {
             tfidf_text.transition()
                 .duration("150")
                 .style("opacity",1.0)
-            d3.select(this.parentNode).selectAll("#datacircle, #starglyph, #starglyphpath, path").transition()
+            d3.select(this.parentNode).selectAll("#datacircle, #starglyph, #starglyphpath, #glyph-line").transition()
                 .duration("250")
                 .style("transform","scale(1.1)")
                 
@@ -488,7 +492,7 @@ function create_circle(svg,color,text,tfidf) {
             tfidf_text.transition()
                 .duration("150")
                 .style("opacity",0.0)
-            d3.select(this.parentNode).selectAll("#datacircle, #starglyph, #starglyphpath, path").transition()
+            d3.select(this.parentNode).selectAll("#datacircle, #starglyph, #starglyphpath, #glyph-line").transition()
                 .duration("250")
                 .style("transform","scale(1.0)")
         })
@@ -546,4 +550,43 @@ function showModal(detailData,color,word) {
     document.getElementById("starglyph-tab").click() //Emulate click on first tab element tor reset detail modal
     updateStarglyph(detailData,color)
 }
+
+
+/**
+ * From https://stackoverflow.com/a/44779316
+ *
+ * @param {Function} fn Callback function
+ * @param {Boolean|undefined} [throttle] Optionally throttle callback
+ * @return {Function} Bound function
+ *
+ * @example
+ * //generate rAFed function
+ * jQuery.fn.addClassRaf = bindRaf(jQuery.fn.addClass);
+ *
+ * //use rAFed function
+ * $('div').addClassRaf('is-stuck');
+ */
+ function bindRaf(fn, throttle) {
+    var isRunning;
+    var that;
+    var args;
+  
+    var run = function() {
+      isRunning = false;
+      fn.apply(that, args);
+    };
+  
+    return function() {
+      that = this;
+      args = arguments;
+  
+      if (isRunning && throttle) {
+        return;
+      }
+  
+      isRunning = true;
+      requestAnimationFrame(run);
+    };
+  }
+
 

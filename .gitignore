@@ -3,11 +3,12 @@
 *.pck
 *.hdf5
 /data/nyt_corpus
-/data/glove
+/data/embeddings
 /.bpm-env
 /dask
 /.vscode
 /.bp-env
 /.env
 /.test-env
+/virt
 __pycache__/

@@ -1,8 +1,6 @@
 import os
 from typing import Counter
 
-from flask.templating import DispatchingJinjaLoader
-
 import bpm.tf_idf as tf_idf
 import bpm.nyt_corpus as nyt
 import bpm.tools as tools
@@ -13,11 +11,11 @@ import pandas as pd
 from pandas.io import pickle
 
 from textacy import extract
-import editdistance
 
 import pickle
 import re
 import itertools
+import sklearn.metrics as skm
 
 from flask import Flask, json, jsonify, g, redirect, request, url_for, render_template, send_from_directory
 
@@ -178,7 +176,7 @@ def search_term():
     deep = bool(request.args.get('deep', 0, type=int)) #HACK: type=bool doesnt work, thus passing int with 0=False and 1=True
 
     # If the search term is not in our vocabulary, abort the request and send error back to client
-    if term not in tf_idf.count_vectorizer.vocabulary_: 
+    if term not in tf_idf.word2id: 
         raise InvalidTerms(term)
 
     # Generate the unique id for this query, and check if this has already been computed. If so, return it.
@@ -223,11 +221,21 @@ def search_term():
 
     print("calculate tfidf")
     names, vectors_list = tf_idf.calculate_tf_idf_scores_counter(counters)
+
+    similarities = []
+    for i in range(1,len(vectors_list)):
+        # Calculate cosine similarity between tfidf vectors 
+        # To Calculate a Semantic change value
+        sim_array = skm.pairwise.cosine_similarity([vectors_list[i-1]],[vectors_list[i]])
+        sim = sim_array[0,0]
+        similarities.append(sim)
+        print("Similarity: ", sim)
     
     print("calculate topn")
     output = {}
     for i in range(0,len(vectors_list)):
         matrix = vectors_list[i]
+
         # Calculate the top n relevant terms
         topn_idx = tools.get_topn_filtered(matrix,names,term,count)
 
@@ -240,6 +248,8 @@ def search_term():
         date_to = pd.to_datetime(date_ranges[i+1])
         column_data["date_from"] = date_from
         column_data["date_to"] = date_to
+        if i < len(similarities):
+            column_data["similarity_to_next"] = similarities[i]
 
         word_list = {}
         for idx in topn_idx:
@@ -302,5 +312,5 @@ if __name__ == "__main__":
     tf_idf.initialize_idf()
     we.initialize_embeddings()
     
-    app.run(debug=False)
+    app.run(debug=False,host="0.0.0.0",port="8080")
     app.add_url_rule('/favicon.ico', redirect_to=url_for('static', filename='favicon.ico'))

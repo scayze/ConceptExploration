@@ -13,6 +13,46 @@ from textacy import extract
 import bpm.tf_idf as tf_idf
 
 #%%
+
+import pickle
+with open('idf_dataOLD.pck', 'rb') as f:
+    data = pickle.load(f)
+    tfidf_transformer = data[0]
+    count_vectorizer = data[1]
+
+word2id = count_vectorizer.vocabulary_
+idf = tfidf_transformer.idf_
+print(word2id)
+print(idf)
+
+with open('idf_data.pck', 'wb') as f:
+    pickle.dump([word2id,idf], f)
+
+
+#%%
+import sklearn.metrics as skm
+import numpy as np
+a = np.array([[0.1,0.2,0.3,0.4,0.6,0.7]])
+b = np.array([[0.1,0.2,0.56,0.7,0.6,0.7]])
+
+c = np.ndarray([a,b])
+print(c)
+
+r = skm.pairwise.cosine_similarity(a,b)
+print(r[0,0])
+
+#%%
+import bpm.nyt_corpus as nyt
+import pandas as pd
+start_date = pd.to_datetime("2000-01")
+end_date = pd.to_datetime("2000-03")
+docgen = nyt.get_doc_generator_between(start_date,end_date)
+i = 0
+for doc in docgen:
+    i+=1
+    print(doc[0:3])
+print(i)
+#%%
 from datetime import date, timedelta
 
 start_date = pd.to_datetime("2000-01")#.to_datetime64().astype("timedelta64[D]")
@@ -48,6 +88,11 @@ example_data = [
     ["global warming", "bush","climate change","peanuts"],
     ["banana","apple"]
 ]
+import time
+start = time.time()
+a = tf.count_vectorizer.get_feature_names()
+end = time.time()
+print(end-start)
 #%%
 import editdistance
 import numpy as np

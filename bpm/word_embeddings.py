@@ -1,5 +1,4 @@
 import numpy as np
-from MulticoreTSNE import MulticoreTSNE as TSNE #from sklearn.manifold import TSNE 
 from sklearn.decomposition import PCA
 import pickle
 import os
@@ -21,7 +20,7 @@ def initialize_embeddings():
             embedding_data = data[1]
     else:
         print("Generating word embeddings data from scratch")
-        e = load_embeddings("data/glove/numberbatch-en.txt")
+        e = load_embeddings("data/embeddings/numberbatch-en.txt")
         embedding_vocab, embedding_data = reduce_embeddings_PCA(e)
         with open(filename, 'wb') as f:
             pickle.dump([embedding_vocab,embedding_data], f)
@@ -56,21 +55,6 @@ def reduce_embeddings_PCA(embeddings):
     
     return words, Y
 
-def reduce_embeddings_TSNE(embeddings):
-    print("init TSNE")
-    tsne = TSNE(n_jobs=4,n_components=2)
-
-    print("get word data in proper format")
-    words =  list(embeddings.keys())
-
-    print("get value data in proper format")
-    vectors = [embeddings[word] for word in words]
-    array = np.array(vectors)
-
-    print("transform that shit")
-    Y = tsne.fit_transform(array)
-    
-    return words, Y
 
 #Potentially do TFIDF reweighting when encountering new word
 def get_embedding(term):

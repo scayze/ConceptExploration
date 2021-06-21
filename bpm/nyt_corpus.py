@@ -3,6 +3,8 @@ import os
 import sys
 import glob
 
+from sklearn.utils.extmath import row_norms
+
 import bpm.tools as tools
 
 import xml.etree.ElementTree as ET
@@ -114,24 +116,15 @@ def get_raw_docs(date_from,date_to):
     )
 
 
-def get_data_generator(date_from,date_to):
-    print("LOADING RAW DOCS")
-    path = 'data/nyt_corpus/data/'
-
-    file_handles = []
-
-    for root, dirs, files in os.walk(path):
-        
-        for f in files:
-            if not f.endswith('.pck'): continue
-            p = os.path.join(root, f) #Get full path between the base path and the file
-            date = pd.to_datetime(p[len(path):-4]) #convert filepath to a datetime object.
-            if date < date_from or date >= date_to: continue #filter if date is not within [from:to]
-            print(date)
-            file_handles.append(p)
-    #single_list = itertools.chain.from_iterable(doc_list["textdata"])
-    return (itertools.chain.from_iterable(pd.read_pickle(handle)["textdata"]) for handle in file_handles)
-
+def get_doc_generator_between(date_from,date_to):
+    data_generator = get_data_generator_between(date_from,date_to)
+    return (
+        row
+        for df 
+        in data_generator
+        for row
+        in df["textdata"]
+    )
 
 def get_data_generator_between(date_from,date_to):
     path = 'data/nyt_corpus/data/'
