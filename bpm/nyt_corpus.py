@@ -1,9 +1,6 @@
-from logging import Handler
 import os
 import sys
 import glob
-
-from sklearn.utils.extmath import row_norms
 
 import bpm.tools as tools
 
@@ -11,13 +8,10 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 
 import spacy
-import spacy.attrs
-
 from spacy.tokens import DocBin
 
 from textacy import extract
 from functools import partial
-import itertools
 
 # Just a function that cleans the corpus folder from unnecessary files i created at some point for testing and such
 def clean_corpus():
@@ -155,7 +149,12 @@ def generate_term_dfs(date_from = pd.to_datetime("1970"), date_to = pd.to_dateti
     for root, dirs, files in os.walk(path):
         for f in files:
             if not f.endswith('.spacy'): continue
+
             p = os.path.join(root, f) #Get full path between the base path and the file
+            new_filename = f.split(".")[0] +".pck"
+            new_path = os.path.join(root, new_filename)
+
+            if os.path.isfile(new_path): continue
 
             date = pd.to_datetime(p[len(path):-6]) #convert filepath to a datetime object.
             if date < date_from or date >= date_to: continue #filter if date is not within [from:to]
@@ -174,7 +173,7 @@ def generate_term_dfs(date_from = pd.to_datetime("1970"), date_to = pd.to_dateti
                 url_list.append(doc.user_data["url"])
             
             df = pd.DataFrame.from_dict({"date":date_list, "url":url_list, "textdata":token_lists})
-            df = df.set_index("date")
+            df.set_index("date",inplace=True)
             tools.make_index_unique(df)
-            new_filename = f.split(".")[0] +".pck"
-            df.to_pickle(os.path.join(root, new_filename))
+
+            df.to_pickle(new_path)

@@ -80,7 +80,7 @@ def make_index_unique(df):
     dt = pd.to_datetime(df.index)
     delta = pd.to_timedelta(df.groupby(dt).cumcount(), unit='ns')
     df.index = (dt + delta.values)
-    df = df.sort_index()
+    df.sort_index(inplace=True)
 
 
 # Splits an array a into n pieces with (if possible) equal length.
