@@ -48,7 +48,6 @@ def index():
 
 @app.route('/_get_concordance')
 def find_matches():
-    output = []
     term = request.args.get('term', 0, type=str)
     word = request.args.get('word', 0, type=str)
     date_from = request.args.get('from', 0, type=str)
