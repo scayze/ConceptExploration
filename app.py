@@ -68,32 +68,7 @@ def find_matches():
 
     date_from = pd.to_datetime(date_from).tz_localize(None)
     date_to = pd.to_datetime(date_to).tz_localize(None)
-    docs_per_month = nyt.get_raw_docs(date_from,date_to)
-
-    for month_docs in docs_per_month:
-        for doc in month_docs:
-
-            #Check for single match in a kinda weird way
-            matches = extract.matches.regex_matches(doc,term)
-
-            found = False
-            for m in matches:
-                found = True
-                break
-            if not found: continue
-
-            #Find KWIQ matches
-            matches = extract.kwic.keyword_in_context(doc,word,ignore_case=True,window_width=100)
-            for m in matches:
-                occurance_dict = {}
-                occurance_dict["left"] = m[0]
-                occurance_dict["kwiq"] = m[1]
-                occurance_dict["right"] = m[2] 
-                occurance_dict["url"] = doc.user_data["url"]
-                output.append(occurance_dict)
-                print("found match")
-            if len(output) > 15: break
-        if len(output) > 15: break
+    output = nyt.keyword_in_context(date_from,date_to,term,word,10)
 
     query_cache[query_id] = output
     with open('query_cache.pck', 'wb') as f:
@@ -117,7 +92,7 @@ def search_custom_glyph():
     for i in range(0,len(glyph_terms)):
         glyph_terms[i] = glyph_terms[i].strip()
         glyph_terms[i] = re.sub(' +', ' ', glyph_terms[i])
-        if glyph_terms[i] not in tf_idf.count_vectorizer.vocabulary_: 
+        if glyph_terms[i] not in tf_idf.word2id: 
             raise InvalidTerms(glyph_terms[i])
 
     query_id = term + ",".join(glyph_terms) + str(date_from) + str(date_to)
@@ -148,7 +123,7 @@ def search_custom_glyph():
     matrix = vectors_list[0]
 
     for term in glyph_terms:
-        idx = tf_idf.count_vectorizer.vocabulary_[term]
+        idx = tf_idf.word2id[term]
         word_data = {}
         word_data["position"] = list(we.get_embedding(term))
         word_data["tfidf"] = str(matrix[idx])
@@ -161,7 +136,7 @@ def search_custom_glyph():
     with open('query_cache.pck', 'wb') as f:
         pickle.dump(query_cache, f)
 
-    #Send off response
+    #Send off response 
     return jsonify(result=output)
 
 @app.route('/_search_term')
@@ -312,5 +287,5 @@ if __name__ == "__main__":
     tf_idf.initialize_idf()
     we.initialize_embeddings()
     
-    app.run(debug=False,host="0.0.0.0",port="8080")
+    app.run(debug=True,host="0.0.0.0",port="8080")
     app.add_url_rule('/favicon.ico', redirect_to=url_for('static', filename='favicon.ico'))

@@ -1,6 +1,7 @@
 import os
 import sys
 import glob
+import re
 
 import bpm.tools as tools
 
@@ -8,6 +9,9 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 
 import spacy
+import pandas as pd
+import time
+import tarfile
 from spacy.tokens import DocBin
 
 from textacy import extract
@@ -85,6 +89,68 @@ def extract_terms(doc):
         )
     )
     return [term.text.lower() for term in terms]
+
+def keyword_in_context(date_from,date_to,filter,term,limit):
+    path = 'data/nyt_corpus/data/'
+    file_handles = []
+
+    for root, dirs, files in os.walk(path):
+        for f in files:
+            if not f.endswith('.tgz'): continue
+            p = os.path.join(root, f) #Get full path between the base path and the file
+            date = pd.to_datetime(p[len(path):-4]) #convert filepath to a datetime object.
+            if date < date_from or date >= date_to: continue #filter if date is not within [from:to]
+            print(date)
+            file_handles.append(p)
+    
+    output = []
+
+    accum_untar = 0.0
+    accum_read = 0.0
+    accum_gen = 0.0
+
+    for handle in file_handles:
+        with tarfile.open(handle, 'r:*') as tar:
+            for inner_file in tar:
+                # Skip everything but the articles
+                if not inner_file.name.endswith(".xml"): continue
+                # Extract single document
+                start = time.time()
+                content = tar.extractfile(inner_file).read().decode('utf8')
+                end = time.time()
+                accum_untar += end-start
+
+                start = time.time()
+                url, date, doc = read_nitf_file(content)
+                end = time.time()
+                accum_read += end-start
+                # Append data
+                start = time.time()
+                if filter not in doc: continue
+
+                occurance_idx = [m.start() for m in re.finditer(term, doc, re.IGNORECASE)]
+                for idx in occurance_idx:
+                    left_from = max(0, idx - 150)
+                    left_to = idx
+                    right_from = idx + len(term)
+                    right_to = idx + min(len(doc), len(term) + 150)
+                    
+                    occurance_dict = {}
+                    occurance_dict["left"] = doc[left_from:left_to]
+                    occurance_dict["kwiq"] = term
+                    occurance_dict["right"] = doc[right_from:right_to]
+                    occurance_dict["url"] = url
+                    output.append(occurance_dict)
+                end = time.time()
+                accum_gen += end-start
+            #if len(output) >= limit: return output
+        #if len(output) >= limit: return output 
+    print("untar: ", accum_untar)
+    print("read: ", accum_read)
+    print("gen: ", accum_gen)
+    return output
+
+
 
 def get_raw_docs(date_from,date_to):
     print("LOADING RAW DOCS")

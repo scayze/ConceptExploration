@@ -2,6 +2,8 @@ var current_term = "climate change"
 var current_detail = "climate change"
 var current_date_from = "2001-01"
 var current_date_to = "2001-10"
+var current_column
+var last_starglyph_query
 var current_data = {}
 
 var lines = []
@@ -59,7 +61,7 @@ $(function() {
                 return
             }
             //Update the starglpyh, with the color it already has
-            color = d3.select("#detail-glyph-circle").attr("stroke")
+            color = d3.select("#detail-glyph-circle").style("stroke")
             updateStarglyph(data.result,color)
             
         });
@@ -97,6 +99,7 @@ function redraw_lines() {
 //Function that is called when the starglyph tab is opened in the detail tab
 function updateStarglyph(data,color) {
     console.log(data)
+    last_starglyph_query = data
     var tab = d3.select("#starglpyh-div")
     tab.selectAll("*").remove()
     create_glyph_circle(tab,data,color)
@@ -220,6 +223,7 @@ function updateGraph(data) {
             //Create circle and starglyph
             circle = create_circle(svg,formatted_color,word,word_list_dict[word].tfidf) //#f3f3f3
                 .on("click",function() {
+                    current_column = key
                     current_date_from = column_dict.date_from
                     current_date_to = column_dict.date_to
                     current_detail = word
@@ -241,7 +245,7 @@ function updateGraph(data) {
             color: 'rgb(0, 0, 0)',
             endPlugSize: 1,
             middleLabel: LeaderLine.pathLabel({
-                text: parseFloat(similarity).toFixed(2),
+                text: parseFloat(1.0-similarity).toFixed(2),
                 color: "grey",
                 fontSize: "12.5px",
                 outlineColor: ""
@@ -511,7 +515,7 @@ function create_glyph_circle(layout,data,color) {
         .style("display", "block")
     
     create_starglyph(svg,data,cx,cy,r-4)
-    //c = position_to_color()
+    console.log(color)
     svg.append("circle")
         .attr("id","detail-glyph-circle")
         .attr('cx', cx)
@@ -540,8 +544,17 @@ function showModal(detailData,color,word) {
     $('#remove_button').bind('click', function() {
         deleted_nodes.push(word)
         updateGraph(current_data)
+
         detailModal.hide()
     });
+    //Unbind all previous handlers, and add a new one for the current apply button
+    $('#apply_button').off() 
+    $('#apply_button').bind('click', function() {
+        current_data[current_column]["words"][word].detail_data = last_starglyph_query
+        updateGraph(current_data)
+        detailModal.hide()
+    });
+
     $('#modal-title').html("Detail View for: " + "<b>" + word + "</b>")
     
     starting_input = Object.keys(detailData).join(", ")
@@ -550,43 +563,3 @@ function showModal(detailData,color,word) {
     document.getElementById("starglyph-tab").click() //Emulate click on first tab element tor reset detail modal
     updateStarglyph(detailData,color)
 }
-
-
-/**
- * From https://stackoverflow.com/a/44779316
- *
- * @param {Function} fn Callback function
- * @param {Boolean|undefined} [throttle] Optionally throttle callback
- * @return {Function} Bound function
- *
- * @example
- * //generate rAFed function
- * jQuery.fn.addClassRaf = bindRaf(jQuery.fn.addClass);
- *
- * //use rAFed function
- * $('div').addClassRaf('is-stuck');
- */
- function bindRaf(fn, throttle) {
-    var isRunning;
-    var that;
-    var args;
-  
-    var run = function() {
-      isRunning = false;
-      fn.apply(that, args);
-    };
-  
-    return function() {
-      that = this;
-      args = arguments;
-  
-      if (isRunning && throttle) {
-        return;
-      }
-  
-      isRunning = true;
-      requestAnimationFrame(run);
-    };
-  }
-
-
