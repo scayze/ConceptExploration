@@ -56,17 +56,6 @@ svg.leader-line {
     pointer-events: auto!important;
 }
 
-/*
-.section:hover {
-    transform: scale(1.1);
-}
-
-.section {
-    transition: all 0.25s;
-    transform-origin: 50% 50%;
-}
-*/
-
 #column_header {
     margin: 0 auto;
     margin-top: 10px;

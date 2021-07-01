@@ -1,12 +1,18 @@
+#
+# This file contains all functions related to generating and loading the word embeddings.
+#
+
 import numpy as np
 from sklearn.decomposition import PCA
 import pickle
 import os
 
-embedding_vocab = None
-embedding_data = None
+#TODO: Make this file a class.
+embedding_vocab = None #The vocabulary of our embeddings
+embedding_data = None #The data structure containing all embeddings
 
-
+# Load the embeddings from disk if they already have been computed,
+# otherwise generate them.
 def initialize_embeddings():
     global embedding_data
     global embedding_vocab
@@ -25,10 +31,11 @@ def initialize_embeddings():
         with open(filename, 'wb') as f:
             pickle.dump([embedding_vocab,embedding_data], f)
 
+#This files read the Numberbatch word embeddings from file and parse them into a dictionary
 def load_embeddings(filepath):
     embeddings= {}
 
-    print("load file")
+    print("Loading embeddings from file")
     with open(filepath, 'r', encoding="utf-8") as f:
         next(f) #Skip header row
         for line in f:
@@ -39,28 +46,27 @@ def load_embeddings(filepath):
 
     return embeddings
 
-
+# This function applies PCA to reduce the embeddings to 2 dimensions.
 def reduce_embeddings_PCA(embeddings):
-    print("init PCA")
+    print("Applying PCA")
     pca = PCA(n_components=2)
 
-    print("get word data in proper format")
+    # Get the data in the right format for sklearns PCA
     words =  list(embeddings.keys())
-
-    print("get value data in proper format")
     vectors = [embeddings[word] for word in words]
     
-    print("transform that shit")
+    # Apply PCA to the data
     Y = pca.fit_transform(vectors)
     
     return words, Y
 
-
-#Potentially do TFIDF reweighting when encountering new word
+#TODO: Potentially do TFIDF weighting of words?
+#Thie function returns the embedding 
 def get_embedding(term):
+    # Spaces are denotes as underscores in our embedding dataset
     embedding_term = term.replace(" ","_")
+    # Return the embedding of the word, if it exists in the dataset
     if embedding_term in embedding_vocab:
-        #print("Return value for: " + term)    
         idx = embedding_vocab.index(embedding_term) 
         return embedding_data[idx]
     elif " " in term:
@@ -72,10 +78,8 @@ def get_embedding(term):
                 sub_word_embeddings.append(embedding_data[idx])
         if len(sub_word_embeddings) > 0:
             #Calculate the mean of the wordembeddings
-            #print("Return mean for: " + term)    
             return np.stack(sub_word_embeddings).mean(axis=0) 
     #If everything fails, return default position
-    #print("Return default for: " + term)    
     return np.array([0.0,0.0]) #Maybe choose a specific color instead of middle.
 
 

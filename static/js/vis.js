@@ -1,3 +1,8 @@
+/*
+This file provides the frontend functionality of the visualization.
+*/
+
+//These variables denote the current state of the website, and are used for various searchqueries
 var current_term = "climate change"
 var current_detail = "climate change"
 var current_date_from = "2001-01"
@@ -6,13 +11,17 @@ var current_column
 var last_starglyph_query
 var current_data = {}
 
+//All LeaderLine connections between different nodes
 var lines = []
+//The Nodes the user decided to delete.
 var deleted_nodes = []
 
+//Request an initial animation frame when the user first visits the size
 window.requestAnimationFrame(redraw_lines);
 
 
 $(function() {
+    //Initialize the colormap, loading the image
     Color2D.setColormap(Color2D.colormaps.ZIEGLER, function() {}); 
     
     //On clicking the submit button after putting in settings
@@ -71,6 +80,7 @@ $(function() {
     //On going to the concordance tab
     $('#concordance-tab').bind('click', function() {
         var table_body = d3.select("#concordance_table")
+        d3.select("#detail-footer").style("display","none")
         //Clear the previous concordance
         table_body.selectAll("*").remove()
         //Query the server with the values put in the form fields
@@ -85,15 +95,20 @@ $(function() {
         });
         return false;
     });
+    //On going to the concordance tab
+    $('#starglyph-tab').bind('click', function() {
+        d3.select("#detail-footer").style("display","block")
+    });
 });
 
-
+//HACK: This is called every frame to redraw the lines at their correct position. 
+//Otherwise, the lines wouldnt show correct when scrolling horizontally
+//This has a strong performance impact. TODO: Find a better method
 function redraw_lines() {
     for(l of lines) {
         l.position()
     }
     window.requestAnimationFrame(redraw_lines);
-    //console.log("SCOLL")
 }
 
 //Function that is called when the starglyph tab is opened in the detail tab
@@ -105,15 +120,11 @@ function updateStarglyph(data,color) {
     create_glyph_circle(tab,data,color)
 }
 
+//This function takes the data returned from the concordance search query, and fills the table with data.
 function updateConcordance(data) {
     var table_body = d3.select("#concordance_table")
 
-    var count = 0
-    max_count = 50
     for(let occurance of data) {
-        count += 1
-        if(count > max_count) break
-
         var tr = table_body.append("tr")
         tr.append("td")
             .attr("class","table-align-right")
@@ -137,6 +148,7 @@ function updateConcordance(data) {
     }
 }
 
+//This function maps a 2d word embedding to a color on the colorscheme of Zeigler et al.
 function position_to_color(pos2d) {
     //Clamp values to bettter fit data in colormap, creating more varied colors
     var xrange = [-0.4,0.7]
@@ -150,28 +162,37 @@ function position_to_color(pos2d) {
     return formatted_color
 }
 
+//This is the main function of the visualization that generates the visualization, once a query has been processed.
+//TODO: This function has gotten to long, split it up into smaller ones.
 function updateGraph(data) {
+    //Log the query result for debugging purposes
     console.log(data)
-    current_data = data
+
+    //Get interval and searchterm data from the inputs
     interval = d3.select("#graph")
     searchterm = d3.select("#searchterm").property("value")
     
+    //Reset the contents of the graph
     var graph = d3.select("#graph")
     graph.html("")
 
+    //Save the data, and the current searchterm for future reference
+    current_data = data
     current_term = searchterm
 
+    //Remove all LeaderLine connections, that remained from last query result
     d3.selectAll(".leader-line").remove()
 
+    //Lists storing various elements of the visualization, for future use
     headers = []
     lines = []
     column_list = []
 
     //For each key in the data, generate a new column with the information in it
-    for (let key in data) {
+    for (let key in data) { //Note: Not using "let" keyword here (and at other places in the code) results in incorrect callbacks
 
-        let column_dict = data[key]
-        let word_list_dict = column_dict.words
+        let column_dict = data[key] //The metadata about each column
+        let word_list_dict = column_dict.words //The word data of each column
 
         //Generate a column for each key
         var col = graph.append("div")
@@ -195,13 +216,14 @@ function updateGraph(data) {
             .text("Documents: " + column_dict.document_count.toString())
 
 
+        //Sort the dictionary keys by their TFIDF value, to properly visually encode their relevance
         let keys = Object.keys(word_list_dict).sort(function(a, b) {
                 return word_list_dict[a].tfidf - word_list_dict[b].tfidf
             }
         ).reverse()
         console.log(keys)
           
-        //console.log(word_dict)
+        //Generate the glyph for each word in a column
         for(let word of keys) { 
             //If the user explicitly deletes this word, remove it from the results
             if (deleted_nodes.includes(word)) continue
@@ -254,11 +276,6 @@ function updateGraph(data) {
         line.size = 2
         lines.push(line)
     }
-    
-    d3.selectAll(".leader-line")
-        .attr("data-bs-toggle", "tooltip")
-        .attr("data-bs-placement","top")
-        .attr("title","Tooltip on top")
 
     //Create lines between circles of same text to visualize bridge terms
     for(var i=1; i<column_list.length; i++) {  
@@ -292,12 +309,10 @@ function updateGraph(data) {
         })
     }
 
+    //Move all leaderlines behind the glyphs, to avoid visual overlap
     d3.selectAll(".leader-line").style("z-index",-5)
-    //var uff = d3.selectAll(".leader-line").remove().each(function() {
-    //    d3.select("#graph").append(this)
-    //})
-    
-    //document.getElementById('graph').appendChild(document.querySelector('.leader-line'));
+
+    //Initialize tooltips (Redundant at the moment)
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl)
@@ -305,28 +320,37 @@ function updateGraph(data) {
 
 }
 
+//Creates a starglyph at given coordiante with given settings
+// layout: The node under which to append the starglyph
+// dict: The data the glyph shall represent
+// cx, cy: the coordinate of the circle
+// r: the radius of the circle
+// showtext: wether the starglyph should be labeld with the terms at each corner
 function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
-    pointstring = ""
-    linepath = ""
-
     var keys =  Object.keys(dict)
     var a_step = 2*Math.PI / keys.length // The angle between each element in the starglyph
+
+    //Strings to later create the starglyph from
+    pointstring = ""
+    linepath = ""
 
     var centerpoint = "M" + cx.toString() + " " + cy.toString() + " "
     linepath += centerpoint + " "
 
     //Normalize the glyph so it takes up 100% of circle
-    
     tfidf_list = []
     for(var i = 0; i<keys.length; i++) {
         var key = keys[i]
         tfidf_list.push(dict[key].tfidf)
     }
+
     //Localy scale the starglyph so the biggest value is 1
     var local_multiplier = 1.0 / Math.max(...tfidf_list)
     
     var gradient_points_list = []
     var color_list = []
+
+    //For each key, generate another corner for the starglyph
     for(var i = 0; i<keys.length; i++) {
         var key = keys[i]
         var tfidf = dict[key].tfidf * local_multiplier
@@ -355,11 +379,12 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
         px = cx + (r+textoffset) * Math.cos(a)
         py = cy + (r+textoffset) * Math.sin(a)
 
-        textanchor = "middle"
-        if(px > cx) textanchor = "start"
-        else if (px < cx) textanchor = "end"
-
         if (showtext) {
+
+            textanchor = "middle"
+            if(px > cx) textanchor = "start"
+            else if (px < cx) textanchor = "end"
+
             let tfidf_text = layout.append("text")
                 .attr("x",px)
                 .attr("y",py + 20)
@@ -388,6 +413,8 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
                         .style("opacity",0.0)
                 })
 
+                //This code is supposed to move the TFIDF value text to the right spot under the term text, but it doesnt seem to work
+                //Apparently getComputedTextLength is only available after one frame is rendered. TODO: fix this
                 //length = title_text.node().getComputedTextLength()
                 //console.log(length)
                 //tfidf_text.attr("x",px - length)
@@ -395,7 +422,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
     }
     
     
-    //Linepath needs to close off at the end
+    //Pathes needs to close off at the end
     linepath += "Z"
     color_list.push(color_list[0])
     gradient_points_list.push(gradient_points_list[0])
@@ -414,7 +441,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
         px2 = gradient_points_list[i][0]
         py2 = gradient_points_list[i][1]
 
-        //Generate a unique ID for the linear gradient to be referred by from the line
+        //Generate a unique ID for the linear gradient to be referred by from the line HACK
         var uid = ("grad" + keys.join("") + i.toString()).split(' ').join('')
         var uid = uid.replace(/\W/g, '')
 
@@ -449,7 +476,11 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
     }
 }
 
-
+// This function creates the glyph on the main view
+// svg: the element to append the glyph to
+// color: the color of the glyph
+// text: The label of the glyph
+// tfidf: the tfidf value of the glyph
 function create_circle(svg,color,text,tfidf) {
 
     svg.append("text")
@@ -469,7 +500,7 @@ function create_circle(svg,color,text,tfidf) {
         .style("pointer-events", "none")
         .style("fill","grey")
         .style("opacity","0.0")
-        .text("TF-IDF: " + parseFloat(tfidf).toFixed(3))
+        .text("TF-IDF: " + parseFloat(tfidf).toFixed(3)) //Cut the float back to 3 digits after comma
     
     circle = svg.append("circle")
         .attr("id","datacircle")
@@ -483,6 +514,7 @@ function create_circle(svg,color,text,tfidf) {
         .style('fill', "#f3f3f3")
         .style('fill-opacity','50%')
         .style("transform-origin", "50% 50%")
+        //Increase the glyphs size while hovering over it
         .on("mouseover", function() {
             tfidf_text.transition()
                 .duration("150")
@@ -503,6 +535,8 @@ function create_circle(svg,color,text,tfidf) {
         return circle
 }
 
+//TODO: This contains duplicate code
+//Create the big glyph circle shown in the detail view
 function create_glyph_circle(layout,data,color) {
     var cricle_div = layout.append("div")
     var cx = 300
@@ -526,10 +560,15 @@ function create_glyph_circle(layout,data,color) {
         .style('fill-opacity','0%')
 }
 
+//Opens the given url in the webbrowser
 function openLink(url) {
     window.open(url, '_blank').focus();
 }
 
+//Opens up the detail view, and initalizes it
+// detailData: the data the view is supposed to represent
+// color: the color of the glyph in the detail view
+// word: the term analyzed
 function showModal(detailData,color,word) {
     var detailModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
 
@@ -555,11 +594,15 @@ function showModal(detailData,color,word) {
         detailModal.hide()
     });
 
+    //Set the title of the detail view
     $('#modal-title').html("Detail View for: " + "<b>" + word + "</b>")
     
+    //Set the starting input to be the top 5 TFIDF terms, available in detailData
     starting_input = Object.keys(detailData).join(", ")
     $('#glyphterms').val(starting_input)
     detailModal.show()
     document.getElementById("starglyph-tab").click() //Emulate click on first tab element tor reset detail modal
+    
+    //Initializes the starglyph
     updateStarglyph(detailData,color)
 }

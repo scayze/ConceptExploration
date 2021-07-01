@@ -1,13 +1,15 @@
+#
+# This file handles the preprocessing of the corpus
+#
+
 import spacy
 from spacy.tokens import DocBin
-
-import os
 import tarfile
-
 import bpm.nyt_corpus as nyt
 
+# Preprocesses the archieve passed in.
 def process_archieve(nlp,path = ""):  
-    print("DOING: " + path)
+    print("PREPROCESSING: " + path)
     user_data = []
     list_document = []
 
@@ -24,7 +26,6 @@ def process_archieve(nlp,path = ""):
             meta = {"url": url, "date": date}
             user_data.append(meta)
             list_document.append(doc)
-            #break
 
     doc_bin = DocBin(attrs=["LEMMA", "POS", "ENT_TYPE", "ENT_IOB"],store_user_data=True)
     
@@ -33,7 +34,6 @@ def process_archieve(nlp,path = ""):
         doc.user_data = user_data[i]
         doc_bin.add(doc)
         i+=1
-        #print("Done: " + str(i))
-    #print(nlp.config)
+
     nlp.to_disk("nlpnlpnlp")
     doc_bin.to_disk(path[:-4] + ".spacy")

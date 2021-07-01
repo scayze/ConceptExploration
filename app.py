@@ -1,6 +1,8 @@
 import os
 from typing import Counter
 
+from scipy.sparse.csr import csr_matrix
+
 import bpm.tf_idf as tf_idf
 import bpm.nyt_corpus as nyt
 import bpm.tools as tools
@@ -76,7 +78,7 @@ def find_matches():
     return jsonify(result=output)
 
 #TODO: /_search_term, /_search_custom_glyph and get_tfidf_from_data have lots of duplicate code. Unify or split in functions
-
+# This function is called when the user changed the terms in the input field of the detail view. It recalculates the scores of that term.
 @app.route('/_search_custom_glyph')
 def search_custom_glyph():
     output = {}
@@ -111,21 +113,24 @@ def search_custom_glyph():
     date_from = pd.to_datetime(date_from).tz_localize(None)
     date_to = pd.to_datetime(date_to).tz_localize(None)
 
-    c = Counter()
+    term_id = tf_idf.word2id[term]
     df_list = nyt.get_data_generator_between(date_from,date_to)
+
+    count = csr_matrix((1,len(tf_idf.idf)),dtype=np.int32)
     for df in df_list:
-        df = df.loc[df["textdata"].apply(lambda x: term in x)]
-        df["textdata"].apply(lambda x: c.update(x))
+        df = df.loc[df["textdata"].apply(lambda x: term_id in x.indices)]
+        if len(df.index) != 0:
+            count += df["textdata"].agg('sum')
 
     print("calculate tfidf")
-    names, vectors_list = tf_idf.calculate_tf_idf_scores_counter([c])
+    names, vectors_list = tf_idf.calculate_tf_idf_scores([count])
     matrix = vectors_list[0]
 
     for term in glyph_terms:
         idx = tf_idf.word2id[term]
         word_data = {}
         word_data["position"] = list(we.get_embedding(term))
-        word_data["tfidf"] = str(matrix[idx])
+        word_data["tfidf"] = str(matrix[0,idx])
         output[term] = word_data
 
     #TODO: Show document counts in the starglpyh too??
@@ -138,15 +143,16 @@ def search_custom_glyph():
     #Send off response 
     return jsonify(result=output)
 
+#This function is called when the user submits a query.
 @app.route('/_search_term')
 def search_term():
     
     # Get all parameters from the request and convert them to the appropriate types
-    term = request.args.get('term', 0, type=str)
+    term = request.args.get('term', 0, type=str).lower()
     interval = request.args.get('interval', 0, type=int)
     date_from = request.args.get('from', 0, type=str)
     date_to = request.args.get('to', 0, type=str)
-    count = int(request.args.get('count', 0, type=str))
+    result_count = int(request.args.get('count', 0, type=str))
     deep = bool(request.args.get('deep', 0, type=int)) #HACK: type=bool doesnt work, thus passing int with 0=False and 1=True
 
     # If the search term is not in our vocabulary, abort the request and send error back to client
@@ -154,12 +160,13 @@ def search_term():
         raise InvalidTerms(term)
 
     # Generate the unique id for this query, and check if this has already been computed. If so, return it.
-    query_id = str(term) + str(interval) + str(date_from) + str(date_to) + str(count) + str(deep)
+    query_id = str(term) + str(interval) + str(date_from) + str(date_to) + str(result_count) + str(deep)
     if query_id in query_cache:
         return jsonify(result=query_cache[query_id])
 
-    # Also abort if the searchterm is an empty string
+    # Also abort if the search term is an empty string
     if term =="": return jsonify({})
+    term_id = tf_idf.word2id[term]
 
     # Log all relevant information to console
     app.logger.info('Request with' + 
@@ -167,7 +174,7 @@ def search_term():
         " interval:" + str(interval) + 
         " from:" + date_from + 
         " to:" + date_to + 
-        " count:" + str(count) + 
+        " count:" + str(result_count) + 
         " deep:" + str(deep)
     )
 
@@ -178,29 +185,31 @@ def search_term():
     # Generate a list of timestamps with the given interval and dates
     date_ranges = list(pd.date_range(date_from, date_to, freq= str(interval)+'MS')) 
 
-    print("Counting")
-    counters = []
+    # load all data, filter it by relevant articles, and count the appearing features together.
+    print("Adding Counts")
+    counts = []
     document_counts = []
     for i in range(0,len(date_ranges)-1):
         print(date_ranges[i])
-        c = Counter()
         doc_count = 0
+        count = csr_matrix((1,len(tf_idf.idf)),dtype=np.int32)
         df_list = nyt.get_data_generator_between(date_ranges[i],date_ranges[i+1])
         for df in df_list:
-            df = df.loc[df["textdata"].apply(lambda x: term in x)]
-            df["textdata"].apply(lambda x: c.update(x))
-            doc_count += len(df.index)
+            df = df.loc[df["textdata"].apply(lambda x: term_id in x.indices)]
+            if len(df.index) != 0:
+                count += df["textdata"].agg('sum')
+                doc_count += len(df.index)
         document_counts.append(doc_count)
-        counters.append(c)
+        counts.append(count)
 
-    print("calculate tfidf")
-    names, vectors_list = tf_idf.calculate_tf_idf_scores_counter(counters)
+    print("Calculate TFIDF")
+    names, vectors_list = tf_idf.calculate_tf_idf_scores(counts)
 
     similarities = []
     for i in range(1,len(vectors_list)):
         # Calculate cosine similarity between tfidf vectors 
         # To Calculate a Semantic change value
-        sim_array = skm.pairwise.cosine_similarity([vectors_list[i-1]],[vectors_list[i]])
+        sim_array = skm.pairwise.cosine_similarity(vectors_list[i-1],vectors_list[i])
         sim = sim_array[0,0]
         similarities.append(sim)
         print("Similarity: ", sim)
@@ -211,7 +220,7 @@ def search_term():
         matrix = vectors_list[i]
 
         # Calculate the top n relevant terms
-        topn_idx = tools.get_topn_filtered(matrix,names,term,count)
+        topn_idx = tools.get_topn_filtered(matrix,names,term,result_count)
 
         #Come up with a title for each column. (Here just Year + Month)
         t = pd.to_datetime(date_ranges[i]) 
@@ -230,7 +239,7 @@ def search_term():
             w = names[idx]
             word_data = {}
             word_data["position"] = list(we.get_embedding(w))
-            word_data["tfidf"] = str(matrix[idx])
+            word_data["tfidf"] = str(matrix[0,idx])
             if deep: word_data["detail_data"] = get_tfidf_from_data(w,date_from,date_to)
             word_list[w] = word_data
         column_data["words"] = word_list
@@ -248,18 +257,19 @@ def search_term():
     return jsonify(result=output)
 
 def get_tfidf_from_data(term,date_from,date_to):
-
-    print("Counting detail")
-    c = Counter()
+    print("Count Detail")
+    term_id = tf_idf.word2id[term]
     doc_count = 0
     df_list = nyt.get_data_generator_between(date_from,date_to)
+    count = csr_matrix((1,len(tf_idf.idf)),dtype=np.int32)
     for df in df_list:
-        df = df.loc[df["textdata"].apply(lambda x: term in x)]
-        df["textdata"].apply(lambda x: c.update(x))
-        doc_count += len(df.index)
+        df = df.loc[df["textdata"].apply(lambda x: term_id in x.indices)]
+        if len(df.index) != 0:
+            count += df["textdata"].agg('sum')
+            doc_count += len(df.index)
 
     print("calculate tfidf")
-    names, vectors_list = tf_idf.calculate_tf_idf_scores_counter([c])
+    names, vectors_list = tf_idf.calculate_tf_idf_scores([count])
     
     matrix = vectors_list[0]
     topn_idx = tools.get_topn_filtered(matrix,names,term,5)
@@ -269,22 +279,23 @@ def get_tfidf_from_data(term,date_from,date_to):
         w = names[idx]
         word_data = {}
         word_data["position"] = list(we.get_embedding(w))
-        word_data["tfidf"] = str(matrix[idx])
+        word_data["tfidf"] = str(matrix[0,idx])
         word_list[w] = word_data
     return word_list
 
+
+#Load the query cache from disk. If it does not exist, create an empty one.
+if os.path.isfile('query_cache.pck'):
+    with open('query_cache.pck', 'rb') as f:
+        query_cache = pickle.load(f)
+else:
+    query_cache = {}
+
+#Load IDF values from disk
+tf_idf.initialize_idf()
+we.initialize_embeddings()
+
 #Start the Flask Server and load necessary files
 if __name__ == "__main__":  
-    
-    if os.path.isfile('query_cache.pck'):
-        with open('query_cache.pck', 'rb') as f:
-            query_cache = pickle.load(f)
-    else:
-        query_cache = {}
-
-    #Load IDF values from disk
-    tf_idf.initialize_idf()
-    we.initialize_embeddings()
-    
     app.run(debug=True,host="0.0.0.0",port="8080")
     app.add_url_rule('/favicon.ico', redirect_to=url_for('static', filename='favicon.ico'))
