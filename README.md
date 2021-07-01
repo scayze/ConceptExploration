@@ -16,9 +16,9 @@ This repository does not contain the New York Times Annotated corpus, used for t
 The Project is also hosted online.
 Notable informations for the usage of the tool:
 - The possible searchable timerange of the tool is 1987-01 to 2007-06. (The timerange in which the corpus provides data)  
-- The processing can take some time (Anything between 1-15min, depending on the query), when the searchbar is "greyed" out (acutally looks more like a bright blue), it is processing. Sending additonal queries will slow the calculation down.
-- ESPECIALLY dont leave the timeinterval at "Monthly" when analyzing a bigger timerange of multiple years. This will result take too long to process, and will clog the server, hindering other queries to process.
+- The processing can take some time (Anything between 1-15min, depending on the query). When the searchbar is "greyed" out (actually looks more like a bright blue), it is processing. Sending additonal queries will slow the calculation down.
+- ESPECIALLY dont leave the timeinterval at "Monthly" when analyzing a timerange of multiple years. This will take too long to process, and will clog the server, hindering other queries to process.
 
 It is available under: http://161.35.27.162:8080/  
 
-Manuel Strey
+Have fun, Manuel Strey
