@@ -2,6 +2,7 @@ import os
 from typing import Counter
 
 from scipy.sparse.csr import csr_matrix
+import scipy
 
 import bpm.tf_idf as tf_idf
 import bpm.nyt_corpus as nyt
@@ -20,6 +21,7 @@ import itertools
 import sklearn.metrics as skm
 
 from flask import Flask, json, jsonify, g, redirect, request, url_for, render_template, send_from_directory
+from werkzeug.middleware.profiler import ProfilerMiddleware
 
 app = Flask(__name__)
 
@@ -72,10 +74,16 @@ def find_matches():
     output = nyt.keyword_in_context(date_from,date_to,term,word,10)
 
     query_cache[query_id] = output
-    with open('query_cache.pck', 'wb') as f:
-        pickle.dump(query_cache, f)
+    save_cache()
     
     return jsonify(result=output)
+
+def save_cache():
+    try:
+        with open('query_cache.pck', 'wb') as f:
+            pickle.dump(query_cache, f)
+    except RuntimeError:
+        print("RuntimerError, skipping cache save")
 
 #TODO: /_search_term, /_search_custom_glyph and get_tfidf_from_data have lots of duplicate code. Unify or split in functions
 # This function is called when the user changed the terms in the input field of the detail view. It recalculates the scores of that term.
@@ -120,7 +128,9 @@ def search_custom_glyph():
     for df in df_list:
         df = df.loc[df["textdata"].apply(lambda x: term_id in x.indices)]
         if len(df.index) != 0:
-            count += df["textdata"].agg('sum')
+            sparse_stack = scipy.sparse.vstack(df["textdata"])
+            sparse_sum = sparse_stack.sum(axis=0)
+            count += csr_matrix(sparse_sum)
 
     print("calculate tfidf")
     names, vectors_list = tf_idf.calculate_tf_idf_scores([count])
@@ -137,8 +147,7 @@ def search_custom_glyph():
 
     #Save to query_cache dict 
     query_cache[query_id] = output
-    with open('query_cache.pck', 'wb') as f:
-        pickle.dump(query_cache, f)
+    save_cache()
 
     #Send off response 
     return jsonify(result=output)
@@ -197,7 +206,9 @@ def search_term():
         for df in df_list:
             df = df.loc[df["textdata"].apply(lambda x: term_id in x.indices)]
             if len(df.index) != 0:
-                count += df["textdata"].agg('sum')
+                sparse_stack = scipy.sparse.vstack(df["textdata"])
+                sparse_sum = sparse_stack.sum(axis=0)
+                count += csr_matrix(sparse_sum)
                 doc_count += len(df.index)
         document_counts.append(doc_count)
         counts.append(count)
@@ -220,7 +231,8 @@ def search_term():
         matrix = vectors_list[i]
 
         # Calculate the top n relevant terms
-        topn_idx = tools.get_topn_filtered(matrix,names,term,result_count)
+        #Add 5 "backup terms" on top of result count, incase the user wants to delete entries
+        topn_idx = tools.get_topn_filtered(matrix,names,term,result_count+5)
 
         #Come up with a title for each column. (Here just Year + Month)
         t = pd.to_datetime(date_ranges[i]) 
@@ -250,8 +262,7 @@ def search_term():
 
     #Save to query_cache dict 
     query_cache[query_id] = output
-    with open('query_cache.pck', 'wb') as f:
-        pickle.dump(query_cache, f)
+    save_cache()
 
     #Send off response
     return jsonify(result=output)
@@ -261,11 +272,14 @@ def get_tfidf_from_data(term,date_from,date_to):
     term_id = tf_idf.word2id[term]
     doc_count = 0
     df_list = nyt.get_data_generator_between(date_from,date_to)
+    #count = np.zeros(len(tf_idf.idf))
     count = csr_matrix((1,len(tf_idf.idf)),dtype=np.int32)
     for df in df_list:
         df = df.loc[df["textdata"].apply(lambda x: term_id in x.indices)]
         if len(df.index) != 0:
-            count += df["textdata"].agg('sum')
+            sparse_stack = scipy.sparse.vstack(df["textdata"])
+            sparse_sum = sparse_stack.sum(axis=0)
+            count += csr_matrix(sparse_sum)
             doc_count += len(df.index)
 
     print("calculate tfidf")
@@ -297,5 +311,8 @@ we.initialize_embeddings()
 
 #Start the Flask Server and load necessary files
 if __name__ == "__main__":  
+    #print("hlo")
+    #app.config['PROFILE'] = True
+    #app.wsgi_app = ProfilerMiddleware(app.wsgi_app)
     app.run(debug=True,host="0.0.0.0",port="8080")
     app.add_url_rule('/favicon.ico', redirect_to=url_for('static', filename='favicon.ico'))

@@ -28,6 +28,8 @@ from scipy.sparse import csr_matrix
 from textacy import extract
 from functools import partial
 
+all_data = None
+
 # Just a function that cleans the corpus folder from unnecessary files i created at some point for testing and such
 def clean_corpus(endings):
     path = 'data/nyt_corpus/data/'
@@ -162,6 +164,10 @@ def get_doc_generator_between(date_from,date_to):
 
 # This function returns a generator that iteratively returns a dataframes betweens a timerange
 def get_data_generator_between(date_from,date_to):
+    #global all_data
+    #if all_data is None:
+    #    all_data = pd.read_pickle("all_data.pck")
+    #return  [all_data.loc[date_from:date_to]]
     path = 'data/nyt_corpus/data/'
     file_handles = []
 

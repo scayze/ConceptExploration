@@ -16,6 +16,27 @@
     font-size: 12;
 }
 
+.bd-example-modal-lg .modal-dialog{
+    display: table;
+    position: relative;
+    margin: 0 auto;
+    top: calc(50% - 24px);
+  }
+
+.bd-example-modal-lg .modal-dialog .modal-content{
+    background-color: transparent;
+    border: none;
+}
+
+#loadingSpinner{
+    position: absolute;
+    margin: auto;
+    top:0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
 #graph {
     margin-top: 0px;
     flex-grow : 1;
@@ -54,6 +75,10 @@
 
 svg.leader-line {
     pointer-events: auto!important;
+}
+
+#starglyph_descriptor {
+    cursor: pointer;
 }
 
 #column_header {

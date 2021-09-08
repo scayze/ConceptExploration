@@ -11,6 +11,8 @@ var current_column
 var last_starglyph_query
 var current_data = {}
 
+var detailModal = null
+
 //All LeaderLine connections between different nodes
 var lines = []
 //The Nodes the user decided to delete.
@@ -22,12 +24,20 @@ window.requestAnimationFrame(redraw_lines);
 
 $(function() {
     //Initialize the colormap, loading the image
+
     Color2D.setColormap(Color2D.colormaps.ZIEGLER, function() {}); 
     
     //On clicking the submit button after putting in settings
     $('#submit').bind('click', function() {
         //Disable the submit button until query is responded to
         $('#submit').addClass('disabled');
+        $('#loading').attr('hidden',false);
+
+        //Remove all LeaderLine connections, that remained from last query result
+        d3.selectAll(".leader-line").remove()
+        var graph = d3.select("#graph")
+        graph.html("")
+
         //Query the server with the values put in the form fields
         $.getJSON('/_search_term', {
             term: $('#searchterm').val(),
@@ -38,6 +48,7 @@ $(function() {
             deep: 1, //HACK: Int instead of bool, bool is bugged
         }, function(data) {
             $('#submit').removeClass('disabled');
+            $('#loading').attr('hidden',true);
             if("message" in data) { //Little hacky way to check if the request failed
                 //Show a toast displaying the error
                 Toast.setPlacement(TOAST_PLACEMENT.BOTTOM_RIGHT);
@@ -46,10 +57,12 @@ $(function() {
             }
             console.log(data)
             //Update the graph with the response
+            
             updateGraph(data.result)
         });
         return false;
     });
+
 
     //On clicking the submit button in the detail view, after putting in custom starglyph terms
     $('#glyph-submit').bind('click', function() {
@@ -221,12 +234,18 @@ function updateGraph(data) {
                 return word_list_dict[a].tfidf - word_list_dict[b].tfidf
             }
         ).reverse()
+
+        //Remove words that the user deleted
+        keys = keys.filter(word => !deleted_nodes.includes(word))
+        //Limit the result count to the user specified one
+        keys = keys.slice(0,parseInt($('#resultcount').val()))
+
         console.log(keys)
           
         //Generate the glyph for each word in a column
         for(let word of keys) { 
             //If the user explicitly deletes this word, remove it from the results
-            if (deleted_nodes.includes(word)) continue
+            //if (deleted_nodes.includes(word)) continue
             //Get 2D embedding of word
             let formatted_color = position_to_color(word_list_dict[word].position)
             //Create a div which will contain each datapoint (circle+text)
@@ -327,7 +346,7 @@ function updateGraph(data) {
 // r: the radius of the circle
 // showtext: wether the starglyph should be labeld with the terms at each corner
 function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
-    var keys =  Object.keys(dict)
+    var keys = Object.keys(dict)
     var a_step = 2*Math.PI / keys.length // The angle between each element in the starglyph
 
     //Strings to later create the starglyph from
@@ -352,9 +371,9 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
 
     //For each key, generate another corner for the starglyph
     for(var i = 0; i<keys.length; i++) {
-        var key = keys[i]
+        let key = keys[i]
         var tfidf = dict[key].tfidf * local_multiplier
-        var color = position_to_color(dict[key].position)
+        let color = position_to_color(dict[key].position)
         color_list.push(color)
 
         var a = a_step * i 
@@ -392,16 +411,24 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
                 .attr("font-size",".8em")
                 .style("opacity",0.0)
                 .style("fill","grey")
-                //HACK: This is hands down the ugliest workaround ive ever written and i hate myself
+                //HACK: This is hands down the ugliest workaround ive ever written
                 .text("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 TF-IDF: " + parseFloat(dict[key].tfidf).toFixed(3) + "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0")
 
             let title_text = layout.append("text")
+                .attr("id","starglyph_descriptor")
                 .attr("x",px)
                 .attr("y",py)
                 .attr("dominant-baseline","middle")
                 .attr("text-anchor",textanchor)
                 .attr("font-size","1em")
                 .text(key)
+                .on("click", function() {
+
+                    //var tab_body = d3.select("#content_starglyph")
+                    //tab_body.selectAll("*").remove()
+                    changeModal(key,color)
+                    current_detail = key
+                })
                 .on("mouseover", function() {
                     tfidf_text.transition()
                         .duration("150")
@@ -570,7 +597,8 @@ function openLink(url) {
 // color: the color of the glyph in the detail view
 // word: the term analyzed
 function showModal(detailData,color,word) {
-    var detailModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
+    detailModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
+    loadingModal = new bootstrap.Modal(document.getElementById("loadingModal"), {})
 
     //Remove the starglyph on close, preventing from linearGradients being overriden at the small circles
     var modalNode = document.getElementById('detailModal')
@@ -593,6 +621,45 @@ function showModal(detailData,color,word) {
         updateGraph(current_data)
         detailModal.hide()
     });
+    //Unbind all previous handlers, and add a new one for the current apply all button
+    $('#apply_all_button').off() 
+    $('#apply_all_button').bind('click', function() {
+        detailModal.hide()
+        loadingModal.show()
+
+        let calls = [];
+
+        for(let column in current_data) {
+            let column_data = current_data[column]
+            console.log(column_data["words"])
+            if(word in column_data["words"]) {
+                query = $.getJSON('/_search_custom_glyph', {
+                    term: current_detail,
+                    glyph_terms: $('#glyphterms').val(),
+                    from: column_data["date_from"],
+                    to: column_data["date_to"],
+                }, function(data) {
+                    $('#glyph-submit').removeClass('disabled');
+                    if("message" in data) { //Little hacky way to check if the request failed
+                        //Show a toast displaying the error
+                        Toast.setPlacement(TOAST_PLACEMENT.BOTTOM_RIGHT);
+                        Toast.create("Error: Invalid Searchterms", "The searchterm: " + data["message"] + " does not exist.",TOAST_STATUS.DANGER, 5000);
+                        return
+                    }
+                    //Update the starglpyh, with the color it already has
+                    current_data[column]["words"][word].detail_data = data.result
+                    
+                });
+                calls.push(query)
+            }
+        }
+
+        $.when.apply($,calls).then(function() {
+            updateGraph(current_data)
+            
+            loadingModal.hide()
+        });
+    });
 
     //Set the title of the detail view
     $('#modal-title').html("Detail View for: " + "<b>" + word + "</b>")
@@ -605,4 +672,85 @@ function showModal(detailData,color,word) {
     
     //Initializes the starglyph
     updateStarglyph(detailData,color)
+}
+
+function changeModal(word,color) {
+   // var detailModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
+
+    //Remove the starglyph on close, preventing from linearGradients being overriden at the small circles
+    var modalNode = document.getElementById('detailModal')
+    modalNode.addEventListener('hidden.bs.modal', function (event) {
+        d3.select("#starglpyh-div").selectAll("*").remove()
+    })
+
+    //Unbind all previous handlers
+    $('#remove_button').off() 
+    $('#apply_button').off() 
+
+    var tab = d3.select("#starglpyh-div")
+    tab.selectAll("*").remove()
+
+    $('#modal-title').html("Detail View for: " + "<b>" + word + "</b>")
+    $('#glyphterms').val("Loading...")
+
+    current_detail = word
+
+    $.getJSON('/_search_term', {
+        term: current_detail,
+        interval: $('#interval_dropdown').val(),
+        from: current_date_from,
+        to: current_date_to,
+        count: 5,
+        deep: false,
+    }, function(data) {
+        //updateStarglyph()
+        let firstKey = Object.keys(data.result)[0]
+        detailData = data.result[firstKey].words
+        //showModal(data.result[firstKey].words,color,key)
+
+        //add new handlers for the new apply and delete buttons
+        $('#remove_button').bind('click', function() {
+            deleted_nodes.push(word)
+            updateGraph(current_data)
+
+            detailModal.hide()
+        });
+   
+        $('#apply_button').bind('click', function() {
+            current_data[current_column]["words"][word].detail_data = last_starglyph_query
+            updateGraph(current_data)
+            detailModal.hide()
+        });
+
+        //Set the title of the detail view
+        
+        
+        //Set the starting input to be the top 5 TFIDF terms, available in detailData
+        //TODO: sort before, probably cutting off potential top words
+        let keys = Object.keys(detailData).sort(function(a, b) {
+                return detailData[a].tfidf - detailData[b].tfidf
+            }
+        ).reverse()
+
+        //Remove words that the user deleted
+        keys = keys.filter(word => !deleted_nodes.includes(word))
+        //Limit the result count to the user specified one
+        keys = keys.slice(0,5)
+
+        starting_input = keys.join(", ")
+        $('#glyphterms').val(starting_input)
+
+        top5data = {}
+        for(i=0; i<5; i++) {
+            top5data[keys[i]] = detailData[keys[i]]
+        }
+
+        //detailModal.show()
+        document.getElementById("starglyph-tab").click() //Emulate click on first tab element tor reset detail modal
+        
+        //Initializes the starglyph
+        updateStarglyph(top5data,color)
+    });
+
+
 }

@@ -46,13 +46,17 @@
                     <div class="tab-pane fade show active" id="content_starglyph" role="tabpanel" aria-labelledby="starglyph-tab">
                         <form>
                             <div class="form-group row">
-                                <div class="col-sm-11">
+                                <div class="col-sm-10">
                                     <label for="searchterm">Starglyph Terms</label>
                                     <input class="form-control" id="glyphterms" type="text" placeholder="Search the Data" />
                                 </div>  
                                 <div class="col-sm-1"> 
-                                    <label for="submit"></label>
+                                    <label for="glyph-submit"></label>
                                     <button class="btn btn-primary form-select" type="button" id="glyph-submit">Search</button>
+                                </div> 
+                                <div class="col-sm-1"> 
+                                    <label for="reset"></label>
+                                    <button class="btn btn-primary form-select" type="button" id="glyph-reset">Reset</button>
                                 </div> 
                             </div>
                         </form>
@@ -87,17 +91,32 @@
 
             <div align="right">
                 Apply this starglpyh to the main view
-                <button type="button" id="apply_button" style="width: 100px;" class="btn btn-outline-success" data-bs-dismiss="modal"> Apply</button>
+                <button type="button" id="apply_button" style="width: 120px;" class="btn btn-outline-success" > Apply</button>
+                <button type="button" id="apply_all_button" style="width: 120px;" class="btn btn-outline-success" > Apply To All</button>
             </div>
             <div align="right">
                 Delete this starglyph from the main view
-                <button type="button" id="remove_button" style="width: 100px;" class="btn btn-outline-danger"> Delete</button>
+                <button type="button" id="remove_button" style="width: 245px;" class="btn btn-outline-danger"> Delete</button>
             </div>
+
             </div>
         </div>
         </div>
     </div>
   
+    <!-- Loading Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true">
+        <div id="innerLoadingModal" class="modal-dialog modal-dialog-centered modal-sm" >
+            <div class="modal-content" style="background-color: transparent;
+            border: none;">
+                <div class="modal-body">
+                    <div class="spinner-border text-light" id="loadingSpinner" style="width: 7rem; height: 7rem;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
   
     <div id="outer">
         <div id="header">
@@ -145,6 +164,19 @@
         <h4 id="vis_header">Visualization</h4>
         <div id="vis_line"></div>
         <div class="row flex-row flex-nowrap" id="graph" onscroll=""></div>
+
+        <div id="loading" style="text-align: center; overflow-y: hidden" hidden> 
+            Loading... <br>
+            This can take up to 20 minutes, depending on the query.
+            <div class="d-flex justify-content-center">
+        
+                <div class="spinner-border" role="status">
+                  <span class="sr-only"></span>
+                </div>
+            </div>
+        </div>
+
+
     </div>
     
     <script src="{{ url_for('static', filename='js/lib/toaster.min.js') }}"></script>
