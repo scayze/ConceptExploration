@@ -78,7 +78,7 @@ def reduce_embeddings_PCA(embeddings):
     return words, Y
 
 #TODO: Merge with get_embedding_vector()
-#Thie function returns the embedding 
+#Thie function returns the 2d embedding of out input term 
 def get_embedding(term):
     # Spaces are denotes as underscores in our embedding dataset
     embedding_term = term.replace(" ","_")
@@ -99,6 +99,7 @@ def get_embedding(term):
     #If everything fails, return default position
     return np.array([0.0,0.0]) #Maybe choose a specific color instead of middle.
 
+#Thie function returns the embedding of our input term
 def get_embedding_vector(term):
     # Spaces are denotes as underscores in our embedding dataset
     embedding_term = term.replace(" ","_")
@@ -119,9 +120,10 @@ def get_embedding_vector(term):
     #If everything fails, return default position
     return None #Maybe choose a specific color instead of middle.
 
+# This function finds similar terms within the vocabulary to the input term.
 def find_similar(term):
     vector = get_embedding_vector(term)
-    result = annoyVOCAB.get_nns_by_vector(vector, 5)
+    result = annoyVOCAB.get_nns_by_vector(vector, 5) #Get the 5 nearest neighbours with annoy
     print(result)
     for r in result:
         print(tf.id2word[r])

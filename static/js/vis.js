@@ -745,15 +745,13 @@ function showModal(detailData,color,word) {
 
 
 function changeModal(word,color) {
-   // var detailModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
-
     //Remove the starglyph on close, preventing from linearGradients being overriden at the small circles
     let modalNode = document.getElementById('detailModal')
     modalNode.addEventListener('hidden.bs.modal', function (event) {
         d3.select("#starglpyh-div").selectAll("*").remove()
     })
 
-    //Unbind all previous handlers
+    //Unbind all previous handlers, once browsed away these user interactions do not make sense to perform
     $('#remove_button').off() 
     $('#remove_button').addClass("disabled")
 
@@ -798,6 +796,7 @@ function changeModal(word,color) {
 
 }
 
+//Returns the top n most relevant terms within a dictionary, and additionally filters the results by the terms we deleted.
 function getTopN(word_dict,n,filter=true) {
     //Set the starting input to be the top 5 TFIDF terms, available in detailData
     let keys = Object.keys(word_dict).sort(
