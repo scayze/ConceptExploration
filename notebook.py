@@ -2,6 +2,7 @@
 import pandas as pd
 import os
 import time
+from pandas.io import pickle
 
 import scipy
 from scipy.sparse.csr import csr_matrix
@@ -9,100 +10,100 @@ import bpm.tf_idf as tf
 from sklearn import preprocessing as skp
 import scipy
 import numpy as np
+import bpm.word_embeddings as we
 from collections import Counter
+import numpy as np
+from annoy import AnnoyIndex
+import pickle
+
+#%%
 tf.initialize_idf()
 #%%
+def load_embeddings(filepath):
+    embeddings= {}
 
+    print("Loading embeddings from file")
+    with open(filepath, 'r', encoding="utf-8") as f:
+        next(f) #Skip header row
+        for line in f:
+            tokens = line.split(" ")
+            word = tokens[0]
+            vector = np.asarray(tokens[1:], "float32")
+            embeddings[word] = vector
 
-def generate_concodrance_files():
-    path = 'data/nyt_corpus/data/'
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            if not f.endswith('.pck_sparse'): continue
-            p = os.path.join(root, f) #Get full path between the base path and the file
-            print(p)
-            df = pd.read_pickle(p)
-            del df["url"]
-            df.to_pickle(p)
+    return embeddings
 
-generate_concodrance_files()
+embeddings = load_embeddings("data/embeddings/numberbatch-en.txt")
+embedding_vocab =  list(embeddings.keys())
+embedding_data = [embeddings[word] for word in embedding_vocab]
+word2id = dict(zip(embedding_vocab,range(0,len(embedding_vocab))))
 
-#%%
-df = pd.read_pickle("all_data.pck")
-#%%
-
-df = pd.read_pickle('data/nyt_corpus/data/2000/01.pck')
-
-
-def to_ids(wordlist):
-    # Create a list of indices from the feature names
-    return [tf.word2id[word] for word in wordlist if word in tf.word2id] 
-
-#Apply the function to the dataframe, and save it to disk.
-df2 = df["textdata"].apply(to_ids)
-print(df2)
-df2.to_pickle("data/nyt_corpus/data/2000/01.aaa")
-
+with open("quicksave.pck", 'wb') as f:
+    pickle.dump([embedding_vocab,embedding_data,word2id], f)
 
 #%%
+with open("quicksave.pck", 'rb') as f:
+    data = pickle.load(f)
+    embedding_vocab = data[0]
+    embedding_data = data[1]
+    word2id = data[2]
+#%%
+f = 300
+t = AnnoyIndex(f, 'angular')
+t.on_disk_build("numberbatch.ann")
 
-def calculate_tf_idf_scores_counter(df):
-    c = Counter()
-    df["textdata"].apply(lambda x: c.update(x))
+for i in range(0,len(embedding_vocab)):
+    t.add_item(i,embedding_data[i])
 
-    tfs = np.zeros(tf.idf.size)
-    for word_id in c.keys():
-        tfs[word_id] = c[word_id]
-    tfidf = skp.normalize([np.multiply(tfs,tf.idf)])[0]
-    return tf.id2word, tfidf
-
-start = time.time()
-df = pd.read_pickle('data/nyt_corpus/data/2000/01.pck')
-end = time.time()
-print(end-start)
-
-start = time.time()
-df_sparse = pd.read_pickle('data/nyt_corpus/data/2000/01.pck_sparse')
-end = time.time()
-print(end-start)
-
-start = time.time()
-df = pd.read_pickle('data/nyt_corpus/data/2000/01.aaa')
-end = time.time()
-print(end-start)
-
-print("Time stack+sum")
-start = time.time()
-#mat = df_sparse["textdata"].agg('sum')
-bm = scipy.sparse.vstack(df_sparse["textdata"])
-b = bm.sum(axis=0)
-csr_b = csr_matrix(b)
-end = time.time()
-print(end-start)
-print(type(csr_b))
-print(csr_b)
-
-print("Time agg")
-start = time.time()
-mat = df_sparse["textdata"].agg('sum')
-end = time.time()
-print(end-start)
-print(type(mat))
-print(mat)
 
 #%%
-print("time counter 2")
+t.build(30)
 
-a = tf.calculate_tf_idf_scores([mat])
-df = df.reset_index().set_index("date")
+#%%
+def get_embedding(term):
+    # Spaces are denotes as underscores in our embedding dataset
+    embedding_term = term.replace(" ","_")
+    # Return the embedding of the word, if it exists in the dataset
+    if embedding_term in word2id:
+        idx = word2id[embedding_term]
+        return embedding_data[idx]
+    elif " " in term:
+        sub_words = term.split(" ")
+        sub_word_embeddings = []
+        for sw in sub_words:
+            if sw in word2id: 
+                idx = word2id[sw]
+                sub_word_embeddings.append(embedding_data[idx])
+        if len(sub_word_embeddings) > 0:
+            #Calculate the mean of the wordembeddings
+            return np.stack(sub_word_embeddings).mean(axis=0) 
+    #If everything fails, return default position
+    return None #Maybe choose a specific color instead of middle.
 
-start = time.time()
-a = calculate_tf_idf_scores_counter(df)
-end = time.time()
-print(end-start)
+#%%
+f = 300
+t = AnnoyIndex(f, 'angular')
+t.on_disk_build("test.ann")
+
+for i in range(0,len(tf.id2word)):
+    vector = get_embedding(tf.id2word[i])
+    if vector is not None:
+        t.add_item(i,vector)
 
 
+#%%
+t.build(30)
 
-#print(df["textdata"])
+#%%
+
+t = AnnoyIndex(300,"angular")
+t.load("test.ann")
+
+vector = get_embedding("genital")#keys.index("global_warming")
+result = t.get_nns_by_vector(vector, 5)
+print(result)
+for r in result:
+    print(tf.id2word[r])
 
 
+# %%

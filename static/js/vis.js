@@ -12,6 +12,7 @@ var last_starglyph_query
 var current_data = {}
 
 var detailModal = null
+var loadingModal = null
 
 //All LeaderLine connections between different nodes
 var lines = []
@@ -26,6 +27,10 @@ $(function() {
     //Initialize the colormap, loading the image
 
     Color2D.setColormap(Color2D.colormaps.ZIEGLER, function() {}); 
+
+    //Initialize modals
+    detailModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
+    loadingModal = new bootstrap.Modal(document.getElementById("loadingModal"), {})
     
     //On clicking the submit button after putting in settings
     $('#submit').bind('click', function() {
@@ -35,7 +40,7 @@ $(function() {
 
         //Remove all LeaderLine connections, that remained from last query result
         d3.selectAll(".leader-line").remove()
-        var graph = d3.select("#graph")
+        let graph = d3.select("#graph")
         graph.html("")
 
         //Query the server with the values put in the form fields
@@ -50,12 +55,9 @@ $(function() {
             $('#submit').removeClass('disabled');
             $('#loading').attr('hidden',true);
             if("message" in data) { //Little hacky way to check if the request failed
-                //Show a toast displaying the error
-                Toast.setPlacement(TOAST_PLACEMENT.BOTTOM_RIGHT);
-                Toast.create("Error: Invalid Searchterm", "The searchterm: " + data["message"] + " does not exist.",TOAST_STATUS.DANGER, 5000);
+                showSimilarWords(data["message"])
                 return
             }
-            console.log(data)
             //Update the graph with the response
             
             updateGraph(data.result)
@@ -77,13 +79,12 @@ $(function() {
         }, function(data) {
             $('#glyph-submit').removeClass('disabled');
             if("message" in data) { //Little hacky way to check if the request failed
-                //Show a toast displaying the error
-                Toast.setPlacement(TOAST_PLACEMENT.BOTTOM_RIGHT);
-                Toast.create("Error: Invalid Searchterms", "The searchterm: " + data["message"] + " does not exist.",TOAST_STATUS.DANGER, 5000);
+                showSimilarWords(data["message"])
                 return
             }
             //Update the starglpyh, with the color it already has
             color = d3.select("#detail-glyph-circle").style("stroke")
+            last_starglyph_query = data.result
             updateStarglyph(data.result,color)
             
         });
@@ -92,7 +93,7 @@ $(function() {
     
     //On going to the concordance tab
     $('#concordance-tab').bind('click', function() {
-        var table_body = d3.select("#concordance_table")
+        let table_body = d3.select("#concordance_table")
         d3.select("#detail-footer").style("display","none")
         //Clear the previous concordance
         table_body.selectAll("*").remove()
@@ -126,28 +127,36 @@ function redraw_lines() {
 
 //Function that is called when the starglyph tab is opened in the detail tab
 function updateStarglyph(data,color) {
-    console.log(data)
-    last_starglyph_query = data
-    var tab = d3.select("#starglpyh-div")
+    let tab = d3.select("#starglpyh-div")
     tab.selectAll("*").remove()
     create_glyph_circle(tab,data,color)
 }
 
+function highlight_keyword(text,keyword) {
+
+}
+
 //This function takes the data returned from the concordance search query, and fills the table with data.
 function updateConcordance(data) {
-    var table_body = d3.select("#concordance_table")
+    let table_body = d3.select("#concordance_table")
 
     for(let occurance of data) {
-        var tr = table_body.append("tr")
+
+        let text_left = occurance.left
+        let text_right = occurance.right
+
+        let tr = table_body.append("tr")
         tr.append("td")
             .attr("class","table-align-right")
-            .text(occurance.left)
+            .attr("class","highlight")
+            .text(text_left)
         tr.append("td")
             .attr("class","table-align-center")
             .html("<p style=\"color:#FF0000\";>" + occurance.kwiq + "</p>")
         tr.append("td")
             .attr("class","table-align-left")
-            .text(occurance.right)
+            .attr("class","highlight")
+            .text(text_right)
         tr.append("td")
             .attr("class","table-align-center")
             .append("button")
@@ -159,19 +168,26 @@ function updateConcordance(data) {
                 openLink(occurance.url)
             })
     }
+    let options = {}
+    options["separateWordSearch"] = false
+    options["each"] = function(mark) {
+        mark.setAttribute("style", "font-weight: bold; background-color:transparent;");
+    }
+
+    $(".highlight").mark(current_term,options);
 }
 
 //This function maps a 2d word embedding to a color on the colorscheme of Zeigler et al.
 function position_to_color(pos2d) {
     //Clamp values to bettter fit data in colormap, creating more varied colors
-    var xrange = [-0.4,0.7]
-    var yrange = [-0.5,0.5]
+    let xrange = [-0.4,0.7]
+    let yrange = [-0.5,0.5]
     pos_x = Math.max( xrange[0], Math.min(pos2d[0], xrange[1]))
     pos_y = Math.max( yrange[0], Math.min(pos2d[1], yrange[1]))
     Color2D.ranges = {x: xrange, y: yrange}; 
-    var rgb = Color2D.getColor(pos_x, pos_y)
+    let rgb = Color2D.getColor(pos_x, pos_y)
     //Convert color to css color value
-    var formatted_color = "rgb(" + rgb[0].toString() + ", " + rgb[1].toString() + ", " + rgb[2].toString() + ")" 
+    let formatted_color = "rgb(" + rgb[0].toString() + ", " + rgb[1].toString() + ", " + rgb[2].toString() + ")" 
     return formatted_color
 }
 
@@ -196,19 +212,55 @@ function updateGraph(data) {
     //Remove all LeaderLine connections, that remained from last query result
     d3.selectAll(".leader-line").remove()
 
+    //explain
+    //d3.select("#vis_header")
+    //    .val("Word evolution for: " + searchterm)
+    $('#vis_header').text("Word evolution for: " + searchterm)
+    d3.select("#detail_icon").style("visibility","visible")
+    d3.select("#detail_icon").on("click",function() {
+        $.getJSON('/_search_detail', {
+            term: searchterm,
+            from: $('#datefrom').val(),
+            to:  $('#dateto').val(),
+        }, function(data) {
+            detailData = data.result.words
+
+            if("message" in data) { //Little hacky way to check if the request failed
+                //Show a toast displaying the error
+
+                showSimilarWords(data["message"])
+                return
+            }
+            //Update the starglpyh, with the color it already has
+            //Set the title of the detail view
+            $('#modal-title').html("Detail View for: " + "<b>" + searchterm + "</b>")
+            
+            //Set the starting input to be the top 5 TFIDF terms, available in detailData
+            starting_input = Object.keys(detailData).join(", ")
+            $('#glyphterms').val(starting_input)
+
+            document.getElementById("starglyph-tab").click() //Emulate click on first tab element tor reset detail modal
+            
+            //Initializes the starglyph
+            let formatted_color = position_to_color(data.result.position)
+            current_detail = searchterm
+            showModal(detailData,formatted_color,searchterm)
+            updateStarglyph(detailData,color)
+        });
+    })
+
     //Lists storing various elements of the visualization, for future use
     headers = []
     lines = []
     column_list = []
 
     //For each key in the data, generate a new column with the information in it
-    for (let key in data) { //Note: Not using "let" keyword here (and at other places in the code) results in incorrect callbacks
-
-        let column_dict = data[key] //The metadata about each column
+    for (let indx = 0; indx < data.length; indx++) { //Note: Not using "let" keyword here (and at other places in the code) results in incorrect callbacks
+        let column_dict = data[indx]
         let word_list_dict = column_dict.words //The word data of each column
 
         //Generate a column for each key
-        var col = graph.append("div")
+        let col = graph.append("div")
             .attr("class","col")
             .attr("data-similarity",column_dict["similarity_to_next"])
             .style("display","flex")
@@ -217,9 +269,11 @@ function updateGraph(data) {
         column_list.push(col)
         
         //Generate the headline of the column
-        var header = col.append("H4")
+        let column_date = new Date(column_dict.date_from)
+        let headline = column_date.getFullYear().toString() + "-" + (column_date.getMonth() + 1).toString().padStart(2,'0')
+        let header = col.append("H4")
             .attr("id","column_header")
-            .text(key)
+            .text(headline)
 
         headers.push(header)
 
@@ -228,20 +282,11 @@ function updateGraph(data) {
             .attr("id","document_count")
             .text("Documents: " + column_dict.document_count.toString())
 
-
-        //Sort the dictionary keys by their TFIDF value, to properly visually encode their relevance
-        let keys = Object.keys(word_list_dict).sort(function(a, b) {
-                return word_list_dict[a].tfidf - word_list_dict[b].tfidf
-            }
-        ).reverse()
-
-        //Remove words that the user deleted
-        keys = keys.filter(word => !deleted_nodes.includes(word))
         //Limit the result count to the user specified one
-        keys = keys.slice(0,parseInt($('#resultcount').val()))
+        let top_n = getTopN(word_list_dict,parseInt($('#resultcount').val()))
+        let keys = Object.keys(top_n)
 
-        console.log(keys)
-          
+  
         //Generate the glyph for each word in a column
         for(let word of keys) { 
             //If the user explicitly deletes this word, remove it from the results
@@ -251,20 +296,22 @@ function updateGraph(data) {
             //Create a div which will contain each datapoint (circle+text)
             let cricle_div = col.append("div")
 
-            var svg = cricle_div.append("svg")
+            let svg = cricle_div.append("svg")
                 .attr("id","circle_div")
                 .attr("width", 200)
                 .attr("height", 150)
                 .style("margin", "auto")
                 .style("display", "block")
             //Get detail of current word to create starglyph
-            let detail_data = word_list_dict[word].detail_data
+            let detail_data = word_list_dict[word].detail_data.words
+            detail_data = getTopN(detail_data,50,false)
+
             //Load data for starglyph from detail data
 
             //Create circle and starglyph
             circle = create_circle(svg,formatted_color,word,word_list_dict[word].tfidf) //#f3f3f3
                 .on("click",function() {
-                    current_column = key
+                    current_column = indx
                     current_date_from = column_dict.date_from
                     current_date_to = column_dict.date_to
                     current_detail = word
@@ -276,9 +323,9 @@ function updateGraph(data) {
     }
 
     //Create dashed lines between headers to visualize semantic change
-    for(var i=1; i<headers.length; i++) {
+    for(let i=1; i<headers.length; i++) {
         similarity = column_list[i-1].attr("data-similarity")
-        var line = new LeaderLine(headers[i-1].node(), headers[i].node());
+        let line = new LeaderLine(headers[i-1].node(), headers[i].node());
         line.setOptions({ 
             //size = 2,
             dash: {len: similarity*50+10, gap: 5},
@@ -297,7 +344,7 @@ function updateGraph(data) {
     }
 
     //Create lines between circles of same text to visualize bridge terms
-    for(var i=1; i<column_list.length; i++) {  
+    for(let i=1; i<column_list.length; i++) {  
         let c_curr = column_list[i]
         let c_prev = column_list[i-1]
 
@@ -308,7 +355,7 @@ function updateGraph(data) {
                 let e_prev = d3.select(this)
                 if(e_curr.attr("data-text") === e_prev.attr("data-text")) {
 
-                    var line = new LeaderLine(
+                    let line = new LeaderLine(
                         e_prev.node(),
                         e_curr.node()
                     );
@@ -346,37 +393,39 @@ function updateGraph(data) {
 // r: the radius of the circle
 // showtext: wether the starglyph should be labeld with the terms at each corner
 function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
-    var keys = Object.keys(dict)
-    var a_step = 2*Math.PI / keys.length // The angle between each element in the starglyph
+    let keys = Object.keys(dict).sort()
+    let a_step = 2*Math.PI / keys.length // The angle between each element in the starglyph
 
     //Strings to later create the starglyph from
     pointstring = ""
     linepath = ""
 
-    var centerpoint = "M" + cx.toString() + " " + cy.toString() + " "
+    let centerpoint = "M" + cx.toString() + " " + cy.toString() + " "
     linepath += centerpoint + " "
 
     //Normalize the glyph so it takes up 100% of circle
     tfidf_list = []
-    for(var i = 0; i<keys.length; i++) {
-        var key = keys[i]
+    console.log(keys)
+    for(let i = 0; i<keys.length; i++) {
+        let key = keys[i]
+        //console.log(key)
         tfidf_list.push(dict[key].tfidf)
     }
 
     //Localy scale the starglyph so the biggest value is 1
-    var local_multiplier = 1.0 / Math.max(...tfidf_list)
+    let local_multiplier = 1.0 / Math.max(...tfidf_list)
     
-    var gradient_points_list = []
-    var color_list = []
+    let gradient_points_list = []
+    let color_list = []
 
     //For each key, generate another corner for the starglyph
-    for(var i = 0; i<keys.length; i++) {
+    for(let i = 0; i<keys.length; i++) {
         let key = keys[i]
-        var tfidf = dict[key].tfidf * local_multiplier
+        let tfidf = dict[key].tfidf * local_multiplier
         let color = position_to_color(dict[key].position)
         color_list.push(color)
 
-        var a = a_step * i 
+        let a = a_step * i 
         
         //Polygon points for the starglyph
         px = cx + (r*tfidf) * Math.cos(a)
@@ -394,7 +443,7 @@ function create_starglyph(layout,dict,cx,cy,r,showtext = true) {
         linepath += point + centerpoint
 
         //Add text at each endpoint of these path
-        var textoffset = 15
+        let textoffset = 15
         px = cx + (r+textoffset) * Math.cos(a)
         py = cy + (r+textoffset) * Math.sin(a)
 
@@ -565,18 +614,18 @@ function create_circle(svg,color,text,tfidf) {
 //TODO: This contains duplicate code
 //Create the big glyph circle shown in the detail view
 function create_glyph_circle(layout,data,color) {
-    var cricle_div = layout.append("div")
-    var cx = 300
-    var cy = 200
-    var r = 150
-    var svg = cricle_div.append("svg")
+    let cricle_div = layout.append("div")
+    let cx = 300
+    let cy = 200
+    let r = 150
+    let svg = cricle_div.append("svg")
         .attr("width", 600)
         .attr("height", 400)
         .style("margin", "auto")
         .style("display", "block")
     
     create_starglyph(svg,data,cx,cy,r-4)
-    console.log(color)
+    
     svg.append("circle")
         .attr("id","detail-glyph-circle")
         .attr('cx', cx)
@@ -592,22 +641,42 @@ function openLink(url) {
     window.open(url, '_blank').focus();
 }
 
+function showSimilarWords(errorTerm) {
+    query = $.getJSON('/_search_similar', {
+        term: errorTerm,
+    }, function(data) {
+        console.log(data.result)
+        similarWords = "\"" + data.result.join("\", \"") + "\"" + "<br>"
+        Toast.setPlacement(TOAST_PLACEMENT.BOTTOM_RIGHT);
+        Toast.create("Invalid Searchterm: " + errorTerm, "Possible alternatives: " + similarWords, TOAST_STATUS.DANGER, 5000);
+    });
+}
+
+
 //Opens up the detail view, and initalizes it
 // detailData: the data the view is supposed to represent
 // color: the color of the glyph in the detail view
 // word: the term analyzed
 function showModal(detailData,color,word) {
-    detailModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
-    loadingModal = new bootstrap.Modal(document.getElementById("loadingModal"), {})
-
     //Remove the starglyph on close, preventing from linearGradients being overriden at the small circles
-    var modalNode = document.getElementById('detailModal')
+    let modalNode = document.getElementById('detailModal')
     modalNode.addEventListener('hidden.bs.modal', function (event) {
         d3.select("#starglpyh-div").selectAll("*").remove()
     })
 
+    starting_input = Object.keys(detailData).join(", ")
+    $('#glyphterms').val(starting_input)
+
+    //Unbind all previous handlers, and add a new one for the current reset button
+    $('#glyph-reset').off()
+    $('#glyph-reset').bind('click', function() {
+        $('#glyphterms').val(starting_input)
+    })
+    
+
     //Unbind all previous handlers, and add a new one for the current delete button
     $('#remove_button').off() 
+    $('#remove_button').removeClass('disabled');
     $('#remove_button').bind('click', function() {
         deleted_nodes.push(word)
         updateGraph(current_data)
@@ -616,13 +685,15 @@ function showModal(detailData,color,word) {
     });
     //Unbind all previous handlers, and add a new one for the current apply button
     $('#apply_button').off() 
+    $('#apply_button').removeClass('disabled');
     $('#apply_button').bind('click', function() {
-        current_data[current_column]["words"][word].detail_data = last_starglyph_query
+        current_data[current_column]["words"][word].detail_data.words = last_starglyph_query
         updateGraph(current_data)
         detailModal.hide()
     });
     //Unbind all previous handlers, and add a new one for the current apply all button
     $('#apply_all_button').off() 
+    $('#apply_all_button').removeClass('disabled');
     $('#apply_all_button').bind('click', function() {
         detailModal.hide()
         loadingModal.show()
@@ -642,12 +713,12 @@ function showModal(detailData,color,word) {
                     $('#glyph-submit').removeClass('disabled');
                     if("message" in data) { //Little hacky way to check if the request failed
                         //Show a toast displaying the error
-                        Toast.setPlacement(TOAST_PLACEMENT.BOTTOM_RIGHT);
-                        Toast.create("Error: Invalid Searchterms", "The searchterm: " + data["message"] + " does not exist.",TOAST_STATUS.DANGER, 5000);
+
+                        showSimilarWords(data["message"])
                         return
                     }
                     //Update the starglpyh, with the color it already has
-                    current_data[column]["words"][word].detail_data = data.result
+                    column_data["words"][word].detail_data.words = data.result
                     
                 });
                 calls.push(query)
@@ -665,8 +736,6 @@ function showModal(detailData,color,word) {
     $('#modal-title').html("Detail View for: " + "<b>" + word + "</b>")
     
     //Set the starting input to be the top 5 TFIDF terms, available in detailData
-    starting_input = Object.keys(detailData).join(", ")
-    $('#glyphterms').val(starting_input)
     detailModal.show()
     document.getElementById("starglyph-tab").click() //Emulate click on first tab element tor reset detail modal
     
@@ -674,78 +743,52 @@ function showModal(detailData,color,word) {
     updateStarglyph(detailData,color)
 }
 
+
 function changeModal(word,color) {
    // var detailModal = new bootstrap.Modal(document.getElementById("detailModal"), {})
 
     //Remove the starglyph on close, preventing from linearGradients being overriden at the small circles
-    var modalNode = document.getElementById('detailModal')
+    let modalNode = document.getElementById('detailModal')
     modalNode.addEventListener('hidden.bs.modal', function (event) {
         d3.select("#starglpyh-div").selectAll("*").remove()
     })
 
     //Unbind all previous handlers
     $('#remove_button').off() 
-    $('#apply_button').off() 
+    $('#remove_button').addClass("disabled")
 
-    var tab = d3.select("#starglpyh-div")
+    $('#apply_button').off()
+    $('#apply_button').addClass("disabled")
+
+    $('#apply_all_button').off()
+    $('#apply_all_button').addClass("disabled")
+
+    let tab = d3.select("#starglpyh-div")
     tab.selectAll("*").remove()
 
+    //Set the title of the detail view
     $('#modal-title').html("Detail View for: " + "<b>" + word + "</b>")
     $('#glyphterms').val("Loading...")
 
     current_detail = word
 
-    $.getJSON('/_search_term', {
+    $.getJSON('/_search_detail', {
         term: current_detail,
-        interval: $('#interval_dropdown').val(),
         from: current_date_from,
         to: current_date_to,
-        count: 5,
-        deep: false,
     }, function(data) {
         //updateStarglyph()
-        let firstKey = Object.keys(data.result)[0]
-        detailData = data.result[firstKey].words
+        detailData = data.result.words
         //showModal(data.result[firstKey].words,color,key)
-
-        //add new handlers for the new apply and delete buttons
-        $('#remove_button').bind('click', function() {
-            deleted_nodes.push(word)
-            updateGraph(current_data)
-
-            detailModal.hide()
-        });
-   
-        $('#apply_button').bind('click', function() {
-            current_data[current_column]["words"][word].detail_data = last_starglyph_query
-            updateGraph(current_data)
-            detailModal.hide()
-        });
-
-        //Set the title of the detail view
-        
-        
-        //Set the starting input to be the top 5 TFIDF terms, available in detailData
-        //TODO: sort before, probably cutting off potential top words
-        let keys = Object.keys(detailData).sort(function(a, b) {
-                return detailData[a].tfidf - detailData[b].tfidf
-            }
-        ).reverse()
-
-        //Remove words that the user deleted
-        keys = keys.filter(word => !deleted_nodes.includes(word))
-        //Limit the result count to the user specified one
-        keys = keys.slice(0,5)
-
-        starting_input = keys.join(", ")
+        let top5data = getTopN(detailData,5)
+        let starting_input = Object.keys(top5data).join(", ")
         $('#glyphterms').val(starting_input)
 
-        top5data = {}
-        for(i=0; i<5; i++) {
-            top5data[keys[i]] = detailData[keys[i]]
-        }
+        $('#glyph-reset').off()
+        $('#glyph-reset').bind('click', function() {
+            $('#glyphterms').val(starting_input)
+        })
 
-        //detailModal.show()
         document.getElementById("starglyph-tab").click() //Emulate click on first tab element tor reset detail modal
         
         //Initializes the starglyph
@@ -753,4 +796,27 @@ function changeModal(word,color) {
     });
 
 
+}
+
+function getTopN(word_dict,n,filter=true) {
+    //Set the starting input to be the top 5 TFIDF terms, available in detailData
+    let keys = Object.keys(word_dict).sort(
+        function(a, b) {
+            return word_dict[a].tfidf - word_dict[b].tfidf
+        }
+    ).reverse()
+
+    //Remove words that the user deleted
+    if(filter) {
+       keys = keys.filter(word => !deleted_nodes.includes(word)) 
+    }
+    
+    //Limit the result count to the user specified one
+    keys = keys.slice(0,Math.min(n,keys.length))
+
+    let top_n = {}
+    for(let i=0; i<keys.length; i++) {
+        top_n[keys[i]] = word_dict[keys[i]]
+    }
+    return top_n
 }

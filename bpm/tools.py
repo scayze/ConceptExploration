@@ -82,6 +82,28 @@ def make_index_unique(df):
     df.index = (dt + delta.values)
     df.sort_index(inplace=True)
 
+# Recursively removes all specified keys from a dict
+# Taken from https://stackoverflow.com/a/20692955/5367241
+def scrub(obj, bad_key="_this_is_bad"):
+    if isinstance(obj, dict):
+        # the call to `list` is useless for py2 but makes
+        # the code py2/py3 compatible
+        for key in list(obj.keys()):
+            if key == bad_key:
+                del obj[key]
+            else:
+                scrub(obj[key], bad_key)
+    elif isinstance(obj, list):
+        for i in reversed(range(len(obj))):
+            if obj[i] == bad_key:
+                del obj[i]
+            else:
+                scrub(obj[i], bad_key)
+
+    else:
+        # neither a dict nor a list, do nothing
+        pass
+
 
 # Splits an array a into n pieces with (if possible) equal length.
 # Taken from https://stackoverflow.com/a/2135920/5367241

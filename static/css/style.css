@@ -28,6 +28,7 @@
     border: none;
 }
 
+
 #loadingSpinner{
     position: absolute;
     margin: auto;
@@ -51,9 +52,21 @@
 }
 
 #vis_line {
+    margin-top: 3px;
     margin-bottom: 0px;
     border-bottom: 2px solid;
     border-color: black /* #ced4da; */;
+}
+
+mark{
+    background: rgb(95, 0, 247);
+    color: black;
+}
+
+
+#modal-window {
+    padding-top: 3%;
+    max-width: 80%;
 }
 
 #starglyphpath {
@@ -79,6 +92,11 @@ svg.leader-line {
 
 #starglyph_descriptor {
     cursor: pointer;
+}
+
+#detail_icon {
+    cursor: pointer;
+    visibility: hidden;
 }
 
 #column_header {

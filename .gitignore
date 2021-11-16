@@ -2,6 +2,7 @@
 *.csv
 *.pck
 *.hdf5
+*.ann
 /data/nyt_corpus
 /data/embeddings
 /.bpm-env

@@ -12,8 +12,8 @@
         <script src="{{ url_for('static', filename='js/lib/color2D.js') }}"></script>
         <script src="{{ url_for('static', filename='js/vis.js') }}"></script>
         <script src="{{ url_for('static', filename='js/lib/bootstrap.bundle.min.js') }}"></script>
-        
-
+        <script src="{{ url_for('static', filename='js/lib/jquery.mark.min.js') }}"></script>
+        <script src="https://kit.fontawesome.com/5ece611741.js" crossorigin="anonymous"></script>
         
         <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
         <link rel="stylesheet" href="{{ url_for('static', filename='css/lib/bootstrap.min.css') }}">
@@ -24,7 +24,7 @@
 
     <!-- Modal -->
     <div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
-        <div class="modal-dialog  modal-xl">
+        <div id="modal-window" class="modal-dialog  modal-xl">
         <div class="modal-content">
             
             <div class="modal-header" style="display: block;">
@@ -131,9 +131,10 @@
                     <div class="col-sm-2">
                         <label for="interval_dropdown">Time Interval</label>
                         <select class="form-select" id="interval_dropdown">
-                            <option value=1 selected="selected">Monthly</option>
+                            <option value=1>Monthly</option>
                             <option value=12>Yearly</option>
-                            <option value=24>2 Yearly</option>
+                            <option value=24 selected="selected">2 Yearly</option>
+                            <option value=36>3 Yearly</option>
                             <option value=60>5 Yearly</option>
                         </select>
                     </div>
@@ -161,7 +162,11 @@
                 </div>
             </form>
         </div>
-        <h4 id="vis_header">Visualization</h4>
+        <div id="vis_header_div">
+            <h4 id="vis_header" style="display: inline; ">Word evolution for: -</h4>
+            <i id="detail_icon" class="fas fa-lg fa-info-circle"></i>
+        </div>
+
         <div id="vis_line"></div>
         <div class="row flex-row flex-nowrap" id="graph" onscroll=""></div>
 

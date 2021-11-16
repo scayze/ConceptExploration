@@ -1,5 +1,0 @@
-Important:
-Todo:
-Optional:
-- Add additional results when deleting nodes
-- Sorted Starglyphs
