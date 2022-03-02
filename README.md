@@ -1,6 +1,9 @@
 # ConceptExplorer
 ### Bachelor Thesis: **"Visual Analysis of Temporal Linguistic Patterns for the Detection of Multigranular Concepts"**
 
+![ConceptExploration](https://user-images.githubusercontent.com/10299514/156286263-e754f5c0-bc29-4b3e-beec-2cee203aab47.png)
+
+
 This is the code submission for the Bachelor Thesis.
   
 The relevant self written files are:
